@@ -977,6 +977,37 @@ require __DIR__ . '/../includes/header.php';
         </section>
     </div>
 
+    <!-- JASA -->
+    <section class="detail-card">
+        <div class="detail-card-header"><span>Finishing</span><button type="button" class="section-action" data-open="modalJasa">+ Tambah Jasa</button></div>
+        <div class="detail-table-wrap">
+            <table class="detail-table">
+                <thead><tr><th style="width:110px;">Tanggal</th><th>Nama Barang</th><th class="number" style="width:130px;">Harga</th><th style="width:80px;">Qty</th><th class="number" style="width:140px;">Total</th><th class="center" style="width:130px;">Aksi</th></tr></thead>
+                <tbody>
+                <?php if (!$jasas): ?>
+                    <tr><td colspan="6" class="detail-empty">Belum ada data finishing.</td></tr>
+                <?php else: foreach ($jasas as $n=>$j): ?>
+                    <tr>
+                        <td><?php echo dateId($j['tanggal']); ?></td>
+                        <td><?php echo h($j['jenis_jasa']); ?></td>
+                        <td class="number"><?php echo rupiah($j['biaya']); ?></td>
+                        <td><?php echo rupiah($j['qty']); ?></td>
+                        <td class="number"><?php echo rupiah($j['total']); ?></td>
+                        <td><div class="row-actions">
+                            <button type="button" class="row-btn" data-open="modalJasaEdit" data-id="<?php echo (int)$j['id']; ?>" data-jenis="<?php echo h($j['jenis_jasa']); ?>" data-keterangan="<?php echo h($j['keterangan']); ?>" data-qty="<?php echo h($j['qty']); ?>" data-biaya="<?php echo h($j['biaya']); ?>" data-tanggal="<?php echo h($j['tanggal']); ?>">Edit</button>
+                            <form method="post" onsubmit="return confirm('Hapus jasa ini?');">
+                                <input type="hidden" name="csrf_token" value="<?php echo h($csrf); ?>"><input type="hidden" name="action" value="delete_jasa"><input type="hidden" name="jasa_id" value="<?php echo (int)$j['id']; ?>">
+                                <button class="row-btn danger" type="submit">Hapus</button>
+                            </form>
+                        </div></td>
+                    </tr>
+                <?php endforeach; endif; ?>
+                </tbody>
+            </table>
+            <div class="detail-total"><span>Total Jasa</span><strong>Rp <?php echo rupiah($totalJasa); ?></strong></div>
+        </div>
+    </section>
+
     <!-- SPAREPART -->
     <section class="detail-card">
         <div class="detail-card-header"><span>Spare Part</span><button type="button" class="section-action" data-open="modalSparepart">+ Tambah Sparepart</button></div>
@@ -1039,46 +1070,15 @@ require __DIR__ . '/../includes/header.php';
         </div>
     </section>
 
-    <!-- JASA -->
-    <section class="detail-card">
-        <div class="detail-card-header"><span>Finishing</span><button type="button" class="section-action" data-open="modalJasa">+ Tambah Jasa</button></div>
-        <div class="detail-table-wrap">
-            <table class="detail-table">
-                <thead><tr><th style="width:110px;">Tanggal</th><th>Nama Barang</th><th class="number" style="width:130px;">Harga</th><th style="width:80px;">Qty</th><th class="number" style="width:140px;">Total</th><th class="center" style="width:130px;">Aksi</th></tr></thead>
-                <tbody>
-                <?php if (!$jasas): ?>
-                    <tr><td colspan="6" class="detail-empty">Belum ada data finishing.</td></tr>
-                <?php else: foreach ($jasas as $n=>$j): ?>
-                    <tr>
-                        <td><?php echo dateId($j['tanggal']); ?></td>
-                        <td><?php echo h($j['jenis_jasa']); ?></td>
-                        <td class="number"><?php echo rupiah($j['biaya']); ?></td>
-                        <td><?php echo rupiah($j['qty']); ?></td>
-                        <td class="number"><?php echo rupiah($j['total']); ?></td>
-                        <td><div class="row-actions">
-                            <button type="button" class="row-btn" data-open="modalJasaEdit" data-id="<?php echo (int)$j['id']; ?>" data-jenis="<?php echo h($j['jenis_jasa']); ?>" data-keterangan="<?php echo h($j['keterangan']); ?>" data-qty="<?php echo h($j['qty']); ?>" data-biaya="<?php echo h($j['biaya']); ?>" data-tanggal="<?php echo h($j['tanggal']); ?>">Edit</button>
-                            <form method="post" onsubmit="return confirm('Hapus jasa ini?');">
-                                <input type="hidden" name="csrf_token" value="<?php echo h($csrf); ?>"><input type="hidden" name="action" value="delete_jasa"><input type="hidden" name="jasa_id" value="<?php echo (int)$j['id']; ?>">
-                                <button class="row-btn danger" type="submit">Hapus</button>
-                            </form>
-                        </div></td>
-                    </tr>
-                <?php endforeach; endif; ?>
-                </tbody>
-            </table>
-            <div class="detail-total"><span>Total Jasa</span><strong>Rp <?php echo rupiah($totalJasa); ?></strong></div>
-        </div>
-    </section>
-
     <!-- TOTAL HPP -->
     <section class="detail-card">
         <div class="detail-card-header"><span>Ringkasan HPP Unit</span></div>
         <div class="detail-card-body">
             <div class="detail-grid">
                 <div class="detail-field"><span class="label">HPP Pembelian Unit</span><span class="value">Rp <?php echo rupiah($hppPembelianUnit); ?></span></div>
-                <div class="detail-field"><span class="label">Sparepart</span><span class="value">Rp <?php echo rupiah($totalSparepart); ?></span></div>
-                <div class="detail-field"><span class="label">Service</span><span class="value">Rp <?php echo rupiah($totalService); ?></span></div>
                 <div class="detail-field"><span class="label">Finishing</span><span class="value">Rp <?php echo rupiah($totalJasa); ?></span></div>
+                <div class="detail-field"><span class="label">Spare Part</span><span class="value">Rp <?php echo rupiah($totalSparepart); ?></span></div>
+                <div class="detail-field"><span class="label">Service</span><span class="value">Rp <?php echo rupiah($totalService); ?></span></div>
                 <div class="detail-field"><span class="label">Total HPP</span><span class="value" style="color:#00a957;font-size:16px;">Rp <?php echo rupiah($totalHPP); ?></span></div>
             </div>
         </div>
