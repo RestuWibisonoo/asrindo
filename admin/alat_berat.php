@@ -235,7 +235,7 @@ try {
     }
 
     $stmt = $pdo->query("
-        SELECT alat_berat_id, COALESCE(SUM(finishing + suku_cadang + jasa), 0) AS total
+        SELECT alat_berat_id, COALESCE(SUM(qty * harga), 0) AS total
         FROM alat_berat_perawatan
         GROUP BY alat_berat_id
     ")->fetchAll(PDO::FETCH_ASSOC);

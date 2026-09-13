@@ -99,7 +99,7 @@ function getUnitHpp(PDO $pdo, int $alatBeratId): float
             ), 0)
             +
             COALESCE((
-                SELECT SUM(finishing + suku_cadang + jasa)
+                SELECT SUM(qty * harga)
                 FROM alat_berat_perawatan
                 WHERE alat_berat_id = ?
             ), 0)
