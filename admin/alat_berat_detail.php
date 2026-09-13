@@ -74,6 +74,10 @@ function dateForInput($v): string {
 
 $csrf = csrfToken();
 $message = '';
+if (isset($_SESSION['flash_message'])) {
+    $message = $_SESSION['flash_message'];
+    unset($_SESSION['flash_message']);
+}
 $error = '';
 $openModal = '';
 
@@ -139,6 +143,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $sparepartId = filter_input(INPUT_POST, 'sparepart_id', FILTER_VALIDATE_INT);
             $qty = money($_POST['qty'] ?? 0);
             $harga = money($_POST['harga'] ?? 0);
+            $tanggal = trim((string)($_POST['tanggal'] ?? ''));
             $keterangan = trim((string)($_POST['keterangan'] ?? ''));
 
             if (!$sparepartId || $qty <= 0) {
@@ -193,10 +198,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $stmt = $pdo->prepare("
                 INSERT INTO alat_berat_sparepart
-                    (alat_berat_id, sparepart_id, qty, harga, keterangan)
-                VALUES (?, ?, ?, ?, ?)
+                    (alat_berat_id, sparepart_id, qty, harga, keterangan, tanggal)
+                VALUES (?, ?, ?, ?, ?, ?)
             ");
-            $stmt->execute([$id, $sparepartId, $qty, $harga, $keterangan]);
+            $stmt->execute([$id, $sparepartId, $qty, $harga, $keterangan, $tanggal === '' ? null : $tanggal]);
 
             $stmt = $pdo->prepare("
                 UPDATE sparepart
@@ -219,6 +224,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $newSparepartId = filter_input(INPUT_POST, 'sparepart_id', FILTER_VALIDATE_INT);
             $newQty = money($_POST['qty'] ?? 0);
             $newHarga = money($_POST['harga'] ?? 0);
+            $newTanggal = trim((string)($_POST['tanggal'] ?? ''));
             $keterangan = trim((string)($_POST['keterangan'] ?? ''));
 
             if (!$relId || !$newSparepartId || $newQty <= 0) {
@@ -276,10 +282,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $stmt = $pdo->prepare("
                     UPDATE alat_berat_sparepart
-                    SET qty=?, harga=?, keterangan=?
+                    SET qty=?, harga=?, keterangan=?, tanggal=?
                     WHERE id=? AND alat_berat_id=? LIMIT 1
                 ");
-                $stmt->execute([$newQty, $newHarga, $keterangan, $relId, $id]);
+                $stmt->execute([$newQty, $newHarga, $keterangan, $newTanggal === '' ? null : $newTanggal, $relId, $id]);
 
                 $stmt = $pdo->prepare("
                     UPDATE sparepart
@@ -320,11 +326,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $stmt = $pdo->prepare("
                     UPDATE alat_berat_sparepart
-                    SET sparepart_id=?, qty=?, harga=?, keterangan=?
+                    SET sparepart_id=?, qty=?, harga=?, keterangan=?, tanggal=?
                     WHERE id=? AND alat_berat_id=? LIMIT 1
                 ");
                 $stmt->execute([
-                    $newSparepartId, $newQty, $newHarga, $keterangan, $relId, $id
+                    $newSparepartId, $newQty, $newHarga, $keterangan, $newTanggal === '' ? null : $newTanggal, $relId, $id
                 ]);
 
                 $stmt = $pdo->prepare("
@@ -377,251 +383,65 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         /* =========================================================
-           ADD RESTORASI + KURANGI STOK
+           ADD SERVICE (Riwayat Perawatan)
            ========================================================= */
-        elseif ($action === 'add_restorasi') {
-            $restorasiId = filter_input(INPUT_POST, 'restorasi_id', FILTER_VALIDATE_INT);
-            $qty = money($_POST['qty'] ?? 0);
+        elseif ($action === 'add_service') {
+            $namaBarang = trim((string)($_POST['nama_barang'] ?? ''));
             $harga = money($_POST['harga'] ?? 0);
-            $keterangan = trim((string)($_POST['keterangan'] ?? ''));
+            $tanggal = trim((string)($_POST['tanggal'] ?? ''));
+            $qty = money($_POST['qty'] ?? 1);
 
-            if (!$restorasiId || $qty <= 0) {
-                throw new RuntimeException('Bahan restorasi dan qty wajib diisi dengan benar.');
-            }
-            if ($harga < 0) {
-                throw new RuntimeException('Harga bahan restorasi tidak boleh bernilai negatif.');
-            }
-
-            $pdo->beginTransaction();
+            if ($namaBarang === '') throw new RuntimeException('Nama barang/jasa wajib diisi.');
 
             $stmt = $pdo->prepare("
-                SELECT id, nama, stok
-                FROM restorasi
-                WHERE id=? FOR UPDATE
-            ");
-            $stmt->execute([$restorasiId]);
-            $rst = $stmt->fetch();
-
-            if (!$rst) {
-                throw new RuntimeException('Bahan restorasi tidak ditemukan.');
-            }
-
-            $stok = (float)$rst['stok'];
-            if ($qty > $stok) {
-                throw new RuntimeException(
-                    'Stok '.$rst['nama'].' tidak mencukupi. Stok tersedia: '.rupiah($stok)
-                );
-            }
-
-            /* Harga komponen diambil dari transaksi pembelian SELESAI terakhir bila kosong. */
-            if ($harga <= 0) {
-                $stmt = $pdo->prepare("
-                    SELECT d.harga
-                    FROM pembelian_restorasi_detail d
-                    INNER JOIN pembelian_restorasi p ON p.id=d.pembelian_id
-                    WHERE d.restorasi_id=?
-                      AND UPPER(p.status)='SELESAI'
-                    ORDER BY p.tanggal DESC, p.id DESC, d.id DESC
-                    LIMIT 1
-                ");
-                $stmt->execute([$restorasiId]);
-                $lastPrice = $stmt->fetchColumn();
-                if ($lastPrice !== false) {
-                    $harga = (float)$lastPrice;
-                }
-            }
-
-            $stmt = $pdo->prepare("
-                INSERT INTO alat_berat_restorasi
-                    (alat_berat_id, restorasi_id, qty, harga, keterangan)
+                INSERT INTO alat_berat_perawatan
+                    (alat_berat_id, tanggal, nama_barang, harga, qty)
                 VALUES (?, ?, ?, ?, ?)
             ");
-            $stmt->execute([$id, $restorasiId, $qty, $harga, $keterangan]);
+            $stmt->execute([
+                $id,
+                $tanggal === '' ? date('Y-m-d') : $tanggal,
+                $namaBarang, $harga, $qty
+            ]);
 
-            $stmt = $pdo->prepare("
-                UPDATE restorasi
-                SET stok = stok - ?
-                WHERE id=? AND stok >= ?
-                LIMIT 1
-            ");
-            $stmt->execute([$qty, $restorasiId, $qty]);
-            if ($stmt->rowCount() !== 1) {
-                throw new RuntimeException('Stok bahan restorasi berubah atau tidak mencukupi.');
-            }
-
-            $pdo->commit();
-            $message = 'Bahan restorasi berhasil ditambahkan dan stok telah dikurangi.';
+            $message = 'Service berhasil ditambahkan.';
         }
 
-        /* EDIT RESTORASI + KOREKSI STOK */
-        elseif ($action === 'edit_restorasi') {
-            $relId = filter_input(INPUT_POST, 'rel_id', FILTER_VALIDATE_INT);
-            $newRestorasiId = filter_input(INPUT_POST, 'restorasi_id', FILTER_VALIDATE_INT);
-            $newQty = money($_POST['qty'] ?? 0);
-            $newHarga = money($_POST['harga'] ?? 0);
-            $keterangan = trim((string)($_POST['keterangan'] ?? ''));
+        /* EDIT SERVICE */
+        elseif ($action === 'edit_service') {
+            $serviceId = filter_input(INPUT_POST, 'service_id', FILTER_VALIDATE_INT);
+            $namaBarang = trim((string)($_POST['nama_barang'] ?? ''));
+            $harga = money($_POST['harga'] ?? 0);
+            $tanggal = trim((string)($_POST['tanggal'] ?? ''));
+            $qty = money($_POST['qty'] ?? 1);
 
-            if (!$relId || !$newRestorasiId || $newQty <= 0) {
-                throw new RuntimeException('Data bahan restorasi tidak valid.');
-            }
-            if ($newHarga < 0) {
-                throw new RuntimeException('Harga bahan restorasi tidak boleh bernilai negatif.');
-            }
-
-            $pdo->beginTransaction();
+            if (!$serviceId || $namaBarang === '') throw new RuntimeException('Data service tidak valid.');
 
             $stmt = $pdo->prepare("
-                SELECT *
-                FROM alat_berat_restorasi
-                WHERE id=? AND alat_berat_id=?
-                FOR UPDATE
+                UPDATE alat_berat_perawatan
+                SET nama_barang=?, harga=?, qty=?, tanggal=?
+                WHERE id=? AND alat_berat_id=? LIMIT 1
             ");
-            $stmt->execute([$relId, $id]);
-            $old = $stmt->fetch();
+            $stmt->execute([
+                $namaBarang, $harga, $qty,
+                $tanggal === '' ? null : $tanggal,
+                $serviceId, $id
+            ]);
 
-            if (!$old) throw new RuntimeException('Detail bahan restorasi tidak ditemukan.');
-
-            $oldRestorasiId = (int)$old['restorasi_id'];
-            $oldQty = (float)$old['qty'];
-
-            $ids = array_values(array_unique([$oldRestorasiId, (int)$newRestorasiId]));
-            sort($ids);
-            $masters = [];
-            foreach ($ids as $rid) {
-                $lock = $pdo->prepare("
-                    SELECT id, nama, stok
-                    FROM restorasi
-                    WHERE id=? FOR UPDATE
-                ");
-                $lock->execute([$rid]);
-                $master = $lock->fetch();
-                if (!$master) throw new RuntimeException('Master bahan restorasi tidak ditemukan.');
-                $masters[$rid] = $master;
-            }
-
-            if ($oldRestorasiId === (int)$newRestorasiId) {
-                $newRst = $masters[$newRestorasiId];
-                $selisih = $newQty - $oldQty;
-
-                if ($selisih > 0 && $selisih > (float)$newRst['stok']) {
-                    throw new RuntimeException(
-                        'Stok '.$newRst['nama'].' tidak mencukupi untuk penambahan qty.'
-                    );
-                }
-
-                if ($newHarga <= 0) {
-                    $newHarga = (float)$old['harga'];
-                }
-
-                $stmt = $pdo->prepare("
-                    UPDATE alat_berat_restorasi
-                    SET qty=?, harga=?, keterangan=?
-                    WHERE id=? AND alat_berat_id=? LIMIT 1
-                ");
-                $stmt->execute([$newQty, $newHarga, $keterangan, $relId, $id]);
-
-                if ($selisih > 0) {
-                    $stmt = $pdo->prepare("
-                        UPDATE restorasi
-                        SET stok = stok - ?
-                        WHERE id=? AND stok >= ?
-                        LIMIT 1
-                    ");
-                    $stmt->execute([$selisih, $newRestorasiId, $selisih]);
-                    if ($stmt->rowCount() !== 1) {
-                        throw new RuntimeException('Stok bahan restorasi tidak mencukupi untuk penambahan qty.');
-                    }
-                } elseif ($selisih < 0) {
-                    $stmt = $pdo->prepare("
-                        UPDATE restorasi SET stok = stok + ?
-                        WHERE id=? LIMIT 1
-                    ");
-                    $stmt->execute([abs($selisih), $newRestorasiId]);
-                }
-            } else {
-                $stmt = $pdo->prepare("
-                    UPDATE restorasi SET stok=stok+?
-                    WHERE id=? LIMIT 1
-                ");
-                $stmt->execute([$oldQty, $oldRestorasiId]);
-
-                $newRst = $masters[$newRestorasiId];
-                if ($newQty > (float)$newRst['stok']) {
-                    throw new RuntimeException(
-                        'Stok '.$newRst['nama'].' tidak mencukupi. Stok tersedia: '.rupiah($newRst['stok'])
-                    );
-                }
-
-                if ($newHarga <= 0) {
-                    $stmt = $pdo->prepare("
-                        SELECT d.harga
-                        FROM pembelian_restorasi_detail d
-                        INNER JOIN pembelian_restorasi p ON p.id=d.pembelian_id
-                        WHERE d.restorasi_id=?
-                          AND UPPER(p.status)='SELESAI'
-                        ORDER BY p.tanggal DESC, p.id DESC, d.id DESC
-                        LIMIT 1
-                    ");
-                    $stmt->execute([$newRestorasiId]);
-                    $lastPrice = $stmt->fetchColumn();
-                    if ($lastPrice !== false) $newHarga = (float)$lastPrice;
-                }
-
-                $stmt = $pdo->prepare("
-                    UPDATE alat_berat_restorasi
-                    SET restorasi_id=?, qty=?, harga=?, keterangan=?
-                    WHERE id=? AND alat_berat_id=? LIMIT 1
-                ");
-                $stmt->execute([$newRestorasiId, $newQty, $newHarga, $keterangan, $relId, $id]);
-
-                $stmt = $pdo->prepare("
-                    UPDATE restorasi SET stok=stok-?
-                    WHERE id=? AND stok >= ?
-                    LIMIT 1
-                ");
-                $stmt->execute([$newQty, $newRestorasiId, $newQty]);
-                if ($stmt->rowCount() !== 1) {
-                    throw new RuntimeException('Stok bahan restorasi baru berubah atau tidak mencukupi.');
-                }
-            }
-
-            $pdo->commit();
-            $message = 'Bahan restorasi berhasil diperbarui dan stok telah disesuaikan.';
+            $message = 'Service berhasil diperbarui.';
         }
 
-        /* DELETE RESTORASI + KEMBALIKAN STOK */
-        elseif ($action === 'delete_restorasi') {
-            $relId = filter_input(INPUT_POST, 'rel_id', FILTER_VALIDATE_INT);
-            if (!$relId) throw new RuntimeException('Detail bahan restorasi tidak valid.');
-
-            $pdo->beginTransaction();
-
+        /* DELETE SERVICE */
+        elseif ($action === 'delete_service') {
+            $serviceId = filter_input(INPUT_POST, 'service_id', FILTER_VALIDATE_INT);
             $stmt = $pdo->prepare("
-                SELECT restorasi_id, qty
-                FROM alat_berat_restorasi
-                WHERE id=? AND alat_berat_id=?
-                FOR UPDATE
+                DELETE FROM alat_berat_perawatan
+                WHERE id=? AND alat_berat_id=? LIMIT 1
             ");
-            $stmt->execute([$relId, $id]);
-            $old = $stmt->fetch();
-
-            if ($old) {
-                $stmt = $pdo->prepare("
-                    UPDATE restorasi SET stok=stok+?
-                    WHERE id=? LIMIT 1
-                ");
-                $stmt->execute([(float)$old['qty'], (int)$old['restorasi_id']]);
-
-                $stmt = $pdo->prepare("
-                    DELETE FROM alat_berat_restorasi
-                    WHERE id=? AND alat_berat_id=? LIMIT 1
-                ");
-                $stmt->execute([$relId, $id]);
-            }
-
-            $pdo->commit();
-            $message = 'Bahan restorasi dihapus dan stok telah dikembalikan.';
+            $stmt->execute([$serviceId, $id]);
+            $message = 'Service berhasil dihapus.';
         }
+
 
         /* ADD JASA MANUAL */
         elseif ($action === 'add_jasa') {
@@ -766,6 +586,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             throw new RuntimeException('Aksi tidak dikenal.');
         }
 
+        if ($message) {
+            $_SESSION['flash_message'] = $message;
+            header("Location: alat_berat_detail.php?id=$id");
+            exit;
+        }
+
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
         $error = $e->getMessage();
@@ -831,6 +657,7 @@ try {
             abs.qty,
             abs.harga,
             abs.keterangan,
+            abs.tanggal,
             s.kode,
             s.nama,
             s.part_number,
@@ -851,46 +678,23 @@ foreach ($spareparts as $sp) {
 }
 
 /* =========================================================
-   LOAD RESTORASI PEMBENTUK UNIT
+   LOAD SERVICE (PERAWATAN)
    ========================================================= */
-$masterRestorasi = [];
-try {
-    $masterRestorasi = $pdo->query("
-        SELECT
-            r.id, r.kode, r.nama, r.jenis, r.merk, r.satuan, r.stok,
-            COALESCE((
-                SELECT d.harga
-                FROM pembelian_restorasi_detail d
-                INNER JOIN pembelian_restorasi p ON p.id=d.pembelian_id
-                WHERE d.restorasi_id=r.id
-                  AND UPPER(p.status)='SELESAI'
-                ORDER BY p.tanggal DESC, p.id DESC, d.id DESC
-                LIMIT 1
-            ),0) AS harga_terakhir
-        FROM restorasi r
-        ORDER BY r.nama ASC
-    ")->fetchAll();
-} catch (Throwable $e) {}
-
-$restorasis = [];
+$services = [];
 try {
     $stmt = $pdo->prepare("
-        SELECT
-            abr.id, abr.alat_berat_id, abr.restorasi_id, abr.qty, abr.harga, abr.keterangan,
-            r.kode, r.nama, r.jenis, r.satuan,
-            (abr.qty * abr.harga) AS total
-        FROM alat_berat_restorasi abr
-        INNER JOIN restorasi r ON r.id=abr.restorasi_id
-        WHERE abr.alat_berat_id=?
-        ORDER BY abr.id ASC
+        SELECT *
+        FROM alat_berat_perawatan
+        WHERE alat_berat_id=?
+        ORDER BY id ASC
     ");
     $stmt->execute([$id]);
-    $restorasis = $stmt->fetchAll();
+    $services = $stmt->fetchAll();
 } catch (Throwable $e) {}
 
-$totalRestorasi = 0;
-foreach ($restorasis as $r) {
-    $totalRestorasi += (float)$r['total'];
+$totalService = 0;
+foreach ($services as $s) {
+    $totalService += (float)$s['harga'] * (float)$s['qty'];
 }
 
 /* =========================================================
@@ -982,7 +786,7 @@ $hppPembelianUnit = $latestPurchase ? (float)$latestPurchase['hpp_pembelian_unit
 /* =========================================================
    HPP = HPP PEMBELIAN + RESTORASI + SPAREPART + JASA
    ========================================================= */
-$totalHPP = $hppPembelianUnit + $totalSparepart + $totalRestorasi + $totalJasa;
+$totalHPP = $hppPembelianUnit + $totalSparepart + $totalService + $totalJasa;
 
 /* Placeholder data yang belum memiliki modul tersendiri. */
 $hargaJualUnit = 0;
@@ -1175,20 +979,22 @@ require __DIR__ . '/../includes/header.php';
 
     <!-- SPAREPART -->
     <section class="detail-card">
-        <div class="detail-card-header"><span>Sparepart Pembentuk Unit</span><button type="button" class="section-action" data-open="modalSparepart">+ Tambah Sparepart</button></div>
+        <div class="detail-card-header"><span>Spare Part</span><button type="button" class="section-action" data-open="modalSparepart">+ Tambah Sparepart</button></div>
         <div class="detail-table-wrap">
             <table class="detail-table">
-                <thead><tr><th>No</th><th>Kode</th><th>Nama Sparepart</th><th>Qty</th><th class="number">Harga</th><th class="number">Total</th><th class="center">Aksi</th></tr></thead>
+                <thead><tr><th style="width:110px;">Tanggal</th><th>Nama Barang</th><th class="number" style="width:130px;">Harga</th><th style="width:80px;">Qty</th><th class="number" style="width:140px;">Total</th><th class="center" style="width:130px;">Aksi</th></tr></thead>
                 <tbody>
                 <?php if (!$spareparts): ?>
-                    <tr><td colspan="7" class="detail-empty">Belum ada sparepart pembentuk unit.</td></tr>
+                    <tr><td colspan="6" class="detail-empty">Belum ada sparepart pembentuk unit.</td></tr>
                 <?php else: foreach ($spareparts as $n=>$sp): ?>
                     <tr>
-                        <td><?php echo $n+1; ?></td><td><?php echo h($sp['kode']); ?></td><td><?php echo h($sp['nama']); ?></td>
+                        <td><?php echo dateId($sp['tanggal']); ?></td>
+                        <td><?php echo h($sp['nama']); ?></td>
+                        <td class="number"><?php echo rupiah($sp['harga']); ?></td>
                         <td><?php echo rupiah($sp['qty']); ?> <?php echo h($sp['satuan']); ?></td>
-                        <td class="number"><?php echo rupiah($sp['harga']); ?></td><td class="number"><?php echo rupiah($sp['total']); ?></td>
+                        <td class="number"><?php echo rupiah($sp['total']); ?></td>
                         <td><div class="row-actions">
-                            <button type="button" class="row-btn" data-open="modalSparepartEdit" data-id="<?php echo (int)$sp['id']; ?>" data-sparepart="<?php echo (int)$sp['sparepart_id']; ?>" data-qty="<?php echo h($sp['qty']); ?>" data-harga="<?php echo h($sp['harga']); ?>" data-keterangan="<?php echo h($sp['keterangan']); ?>">Edit</button>
+                            <button type="button" class="row-btn" data-open="modalSparepartEdit" data-id="<?php echo (int)$sp['id']; ?>" data-sparepart="<?php echo (int)$sp['sparepart_id']; ?>" data-tanggal="<?php echo h($sp['tanggal']); ?>" data-qty="<?php echo h($sp['qty']); ?>" data-harga="<?php echo h($sp['harga']); ?>" data-keterangan="<?php echo h($sp['keterangan']); ?>">Edit</button>
                             <form method="post" onsubmit="return confirm('Hapus sparepart dari unit ini? Stok akan dikembalikan.');">
                                 <input type="hidden" name="csrf_token" value="<?php echo h($csrf); ?>"><input type="hidden" name="action" value="delete_sparepart"><input type="hidden" name="rel_id" value="<?php echo (int)$sp['id']; ?>">
                                 <button class="row-btn danger" type="submit">Hapus</button>
@@ -1202,24 +1008,26 @@ require __DIR__ . '/../includes/header.php';
         </div>
     </section>
 
-    <!-- RESTORASI -->
+    <!-- SERVICE / PERAWATAN -->
     <section class="detail-card">
-        <div class="detail-card-header"><span>Restorasi Pembentuk Unit</span><button type="button" class="section-action" data-open="modalRestorasi">+ Tambah Restorasi</button></div>
+        <div class="detail-card-header"><span>Service</span><button type="button" class="section-action" data-open="modalService">+ Tambah Service</button></div>
         <div class="detail-table-wrap">
             <table class="detail-table">
-                <thead><tr><th>No</th><th>Kode</th><th>Nama Bahan</th><th>Jenis</th><th>Qty</th><th class="number">Harga</th><th class="number">Total</th><th class="center">Aksi</th></tr></thead>
+                <thead><tr><th style="width:110px;">Tanggal</th><th>Nama Barang</th><th class="number" style="width:130px;">Harga</th><th style="width:80px;">Qty</th><th class="number" style="width:140px;">Total</th><th class="center" style="width:130px;">Aksi</th></tr></thead>
                 <tbody>
-                <?php if (!$restorasis): ?>
-                    <tr><td colspan="8" class="detail-empty">Belum ada bahan restorasi pembentuk unit.</td></tr>
-                <?php else: foreach ($restorasis as $n=>$r): ?>
+                <?php if (!$services): ?>
+                    <tr><td colspan="6" class="detail-empty">Belum ada data service.</td></tr>
+                <?php else: foreach ($services as $n=>$s): ?>
                     <tr>
-                        <td><?php echo $n+1; ?></td><td><?php echo h($r['kode']); ?></td><td><?php echo h($r['nama']); ?></td><td><?php echo h($r['jenis'] ?: '-'); ?></td>
-                        <td><?php echo rupiah($r['qty']); ?> <?php echo h($r['satuan']); ?></td>
-                        <td class="number"><?php echo rupiah($r['harga']); ?></td><td class="number"><?php echo rupiah($r['total']); ?></td>
+                        <td><?php echo dateId($s['tanggal']); ?></td>
+                        <td><?php echo h($s['nama_barang']); ?></td>
+                        <td class="number"><?php echo rupiah($s['harga']); ?></td>
+                        <td><?php echo rupiah($s['qty']); ?></td>
+                        <td class="number"><?php echo rupiah($s['harga'] * $s['qty']); ?></td>
                         <td><div class="row-actions">
-                            <button type="button" class="row-btn" data-open="modalRestorasiEdit" data-id="<?php echo (int)$r['id']; ?>" data-restorasi="<?php echo (int)$r['restorasi_id']; ?>" data-qty="<?php echo h($r['qty']); ?>" data-harga="<?php echo h($r['harga']); ?>" data-keterangan="<?php echo h($r['keterangan']); ?>">Edit</button>
-                            <form method="post" onsubmit="return confirm('Hapus bahan restorasi dari unit ini? Stok akan dikembalikan.');">
-                                <input type="hidden" name="csrf_token" value="<?php echo h($csrf); ?>"><input type="hidden" name="action" value="delete_restorasi"><input type="hidden" name="rel_id" value="<?php echo (int)$r['id']; ?>">
+                            <button type="button" class="row-btn" data-open="modalServiceEdit" data-id="<?php echo (int)$s['id']; ?>" data-nama="<?php echo h($s['nama_barang']); ?>" data-harga="<?php echo h($s['harga']); ?>" data-qty="<?php echo h($s['qty']); ?>" data-tanggal="<?php echo h($s['tanggal']); ?>">Edit</button>
+                            <form method="post" onsubmit="return confirm('Hapus service ini?');">
+                                <input type="hidden" name="csrf_token" value="<?php echo h($csrf); ?>"><input type="hidden" name="action" value="delete_service"><input type="hidden" name="service_id" value="<?php echo (int)$s['id']; ?>">
                                 <button class="row-btn danger" type="submit">Hapus</button>
                             </form>
                         </div></td>
@@ -1227,23 +1035,26 @@ require __DIR__ . '/../includes/header.php';
                 <?php endforeach; endif; ?>
                 </tbody>
             </table>
-            <div class="detail-total"><span>Total Restorasi</span><strong>Rp <?php echo rupiah($totalRestorasi); ?></strong></div>
+            <div class="detail-total"><span>Total Service</span><strong>Rp <?php echo rupiah($totalService); ?></strong></div>
         </div>
     </section>
 
     <!-- JASA -->
     <section class="detail-card">
-        <div class="detail-card-header"><span>Jasa Pembentuk Unit</span><button type="button" class="section-action" data-open="modalJasa">+ Tambah Jasa</button></div>
+        <div class="detail-card-header"><span>Finishing</span><button type="button" class="section-action" data-open="modalJasa">+ Tambah Jasa</button></div>
         <div class="detail-table-wrap">
             <table class="detail-table">
-                <thead><tr><th>No</th><th>Jasa</th><th>Keterangan</th><th>Qty</th><th class="number">Biaya</th><th class="number">Total</th><th class="center">Aksi</th></tr></thead>
+                <thead><tr><th style="width:110px;">Tanggal</th><th>Nama Barang</th><th class="number" style="width:130px;">Harga</th><th style="width:80px;">Qty</th><th class="number" style="width:140px;">Total</th><th class="center" style="width:130px;">Aksi</th></tr></thead>
                 <tbody>
                 <?php if (!$jasas): ?>
-                    <tr><td colspan="7" class="detail-empty">Belum ada data jasa pembentuk unit.</td></tr>
+                    <tr><td colspan="6" class="detail-empty">Belum ada data finishing.</td></tr>
                 <?php else: foreach ($jasas as $n=>$j): ?>
                     <tr>
-                        <td><?php echo $n+1; ?></td><td><?php echo h($j['jenis_jasa']); ?></td><td><?php echo h($j['keterangan']); ?></td>
-                        <td><?php echo rupiah($j['qty']); ?></td><td class="number"><?php echo rupiah($j['biaya']); ?></td><td class="number"><?php echo rupiah($j['total']); ?></td>
+                        <td><?php echo dateId($j['tanggal']); ?></td>
+                        <td><?php echo h($j['jenis_jasa']); ?></td>
+                        <td class="number"><?php echo rupiah($j['biaya']); ?></td>
+                        <td><?php echo rupiah($j['qty']); ?></td>
+                        <td class="number"><?php echo rupiah($j['total']); ?></td>
                         <td><div class="row-actions">
                             <button type="button" class="row-btn" data-open="modalJasaEdit" data-id="<?php echo (int)$j['id']; ?>" data-jenis="<?php echo h($j['jenis_jasa']); ?>" data-keterangan="<?php echo h($j['keterangan']); ?>" data-qty="<?php echo h($j['qty']); ?>" data-biaya="<?php echo h($j['biaya']); ?>" data-tanggal="<?php echo h($j['tanggal']); ?>">Edit</button>
                             <form method="post" onsubmit="return confirm('Hapus jasa ini?');">
@@ -1266,8 +1077,8 @@ require __DIR__ . '/../includes/header.php';
             <div class="detail-grid">
                 <div class="detail-field"><span class="label">HPP Pembelian Unit</span><span class="value">Rp <?php echo rupiah($hppPembelianUnit); ?></span></div>
                 <div class="detail-field"><span class="label">Sparepart</span><span class="value">Rp <?php echo rupiah($totalSparepart); ?></span></div>
-                <div class="detail-field"><span class="label">Restorasi</span><span class="value">Rp <?php echo rupiah($totalRestorasi); ?></span></div>
-                <div class="detail-field"><span class="label">Jasa Pembentuk</span><span class="value">Rp <?php echo rupiah($totalJasa); ?></span></div>
+                <div class="detail-field"><span class="label">Service</span><span class="value">Rp <?php echo rupiah($totalService); ?></span></div>
+                <div class="detail-field"><span class="label">Finishing</span><span class="value">Rp <?php echo rupiah($totalJasa); ?></span></div>
                 <div class="detail-field"><span class="label">Total HPP</span><span class="value" style="color:#00a957;font-size:16px;">Rp <?php echo rupiah($totalHPP); ?></span></div>
             </div>
         </div>
@@ -1337,7 +1148,7 @@ require __DIR__ . '/../includes/header.php';
 
 <div class="modal" id="modalSparepart">
 <div class="modal-dialog">
-<div class="modal-header"><strong>Tambah Sparepart Pembentuk Unit</strong><button class="modal-close" data-close>×</button></div>
+<div class="modal-header"><strong>Tambah Spare Part</strong><button class="modal-close" data-close>×</button></div>
 <form method="post">
 <input type="hidden" name="csrf_token" value="<?php echo h($csrf); ?>"><input type="hidden" name="action" value="add_sparepart">
 <div class="modal-body">
@@ -1350,7 +1161,7 @@ require __DIR__ . '/../includes/header.php';
 <option value="<?php echo (int)$sp['id']; ?>" data-harga="<?php echo h($sp['harga_terakhir']); ?>" data-stok="<?php echo h($sp['stok']); ?>"><?php echo h($sp['kode'].' - '.$sp['nama'].' | Stok: '.rupiah($sp['stok'])); ?></option>
 <?php endforeach; ?>
 </select></div>
-<div class="form-field"><label>Qty *</label><input name="qty" id="add_sp_qty" value="1" required></div>
+<div class="form-field"><label>Tanggal</label><input type="date" name="tanggal" value="<?php echo date('Y-m-d'); ?>"></div><div class="form-field"><label>Qty *</label><input name="qty" id="add_sp_qty" value="1" required></div>
 <div class="form-field"><label>Harga Per Unit</label><input name="harga" id="add_sp_harga" value="0"><small id="add_sp_stok" style="display:block;margin-top:4px;color:#8190a5;font-size:9px"></small></div>
 <div class="form-field full"><label>Keterangan</label><textarea name="keterangan"></textarea></div>
 </div></div>
@@ -1359,7 +1170,7 @@ require __DIR__ . '/../includes/header.php';
 
 <div class="modal" id="modalSparepartEdit">
 <div class="modal-dialog">
-<div class="modal-header"><strong>Edit Sparepart Pembentuk Unit</strong><button class="modal-close" data-close>×</button></div>
+<div class="modal-header"><strong>Edit Spare Part</strong><button class="modal-close" data-close>×</button></div>
 <form method="post">
 <input type="hidden" name="csrf_token" value="<?php echo h($csrf); ?>"><input type="hidden" name="action" value="edit_sparepart"><input type="hidden" name="rel_id" id="sp_rel_id">
 <div class="modal-body">
@@ -1368,64 +1179,37 @@ require __DIR__ . '/../includes/header.php';
 <div class="form-field full"><label>Sparepart *</label><select name="sparepart_id" id="edit_sparepart_id" required>
 <?php foreach($masterSparepart as $sp): ?><option value="<?php echo (int)$sp['id']; ?>" data-harga="<?php echo h($sp['harga_terakhir']); ?>" data-stok="<?php echo h($sp['stok']); ?>"><?php echo h($sp['kode'].' - '.$sp['nama'].' | Stok: '.rupiah($sp['stok'])); ?></option><?php endforeach; ?>
 </select></div>
-<div class="form-field"><label>Qty *</label><input name="qty" id="edit_sp_qty" required></div>
+<div class="form-field"><label>Tanggal</label><input type="date" name="tanggal" id="edit_sp_tanggal"></div><div class="form-field"><label>Qty *</label><input name="qty" id="edit_sp_qty" required></div>
 <div class="form-field"><label>Harga Per Unit</label><input name="harga" id="edit_sp_harga" value="0"></div>
 <div class="form-field full"><label>Keterangan</label><textarea name="keterangan" id="edit_sp_keterangan"></textarea></div>
 </div></div>
 <div class="modal-footer"><button type="button" class="btn-secondary" data-close>Batal</button><button class="btn-primary">Update</button></div>
 </form></div></div>
 
-<div class="modal" id="modalRestorasi">
-<div class="modal-dialog">
-<div class="modal-header"><strong>Tambah Restorasi Pembentuk Unit</strong><button class="modal-close" data-close>×</button></div>
-<form method="post">
-<input type="hidden" name="csrf_token" value="<?php echo h($csrf); ?>"><input type="hidden" name="action" value="add_restorasi">
-<div class="modal-body">
-<?php if($openModal==='modalRestorasi'&&$error): ?><div class="alert error"><?php echo h($error); ?></div><?php endif; ?>
-<div class="form-grid">
-<div class="form-field full"><label>Bahan Restorasi *</label>
-<select name="restorasi_id" id="add_restorasi_id" required>
-<option value="">-- Pilih Bahan Restorasi --</option>
-<?php foreach($masterRestorasi as $r): ?>
-<option value="<?php echo (int)$r['id']; ?>" data-harga="<?php echo h($r['harga_terakhir']); ?>" data-stok="<?php echo h($r['stok']); ?>" data-satuan="<?php echo h($r['satuan']); ?>"><?php echo h($r['kode'].' - '.$r['nama'].' | Stok: '.rupiah($r['stok']).' '.$r['satuan']); ?></option>
-<?php endforeach; ?>
-</select></div>
-<div class="form-field"><label>Qty *</label><input name="qty" id="add_rst_qty" value="1" required></div>
-<div class="form-field"><label>Harga Per Unit</label><input name="harga" id="add_rst_harga" value="0"><small id="add_rst_stok" style="display:block;margin-top:4px;color:#8190a5;font-size:9px"></small></div>
-<div class="form-field full"><label>Keterangan</label><textarea name="keterangan"></textarea></div>
-</div></div>
-<div class="modal-footer"><button type="button" class="btn-secondary" data-close>Batal</button><button class="btn-primary">Simpan</button></div>
-</form></div></div>
+<div class="modal" id="modalService">
+<div class="modal-dialog"><div class="modal-header"><strong>Tambah Service</strong><button class="modal-close" data-close>×</button></div>
+<form method="post"><input type="hidden" name="csrf_token" value="<?php echo h($csrf); ?>"><input type="hidden" name="action" value="add_service">
+<div class="modal-body"><?php if($openModal==='modalService'&&$error): ?><div class="alert error"><?php echo h($error); ?></div><?php endif; ?>
+<div class="form-grid"><div class="form-field"><label>Nama Barang / Jasa *</label><input name="nama_barang" required></div><div class="form-field"><label>Tanggal</label><input type="date" name="tanggal" value="<?php echo date('Y-m-d'); ?>"></div><div class="form-field"><label>Harga</label><input name="harga" value="0"></div><div class="form-field"><label>Qty</label><input name="qty" value="1"></div></div></div>
+<div class="modal-footer"><button type="button" class="btn-secondary" data-close>Batal</button><button class="btn-primary">Simpan</button></div></form></div></div>
 
-<div class="modal" id="modalRestorasiEdit">
-<div class="modal-dialog">
-<div class="modal-header"><strong>Edit Restorasi Pembentuk Unit</strong><button class="modal-close" data-close>×</button></div>
-<form method="post">
-<input type="hidden" name="csrf_token" value="<?php echo h($csrf); ?>"><input type="hidden" name="action" value="edit_restorasi"><input type="hidden" name="rel_id" id="rst_rel_id">
-<div class="modal-body">
-<?php if($openModal==='modalRestorasiEdit'&&$error): ?><div class="alert error"><?php echo h($error); ?></div><?php endif; ?>
-<div class="form-grid">
-<div class="form-field full"><label>Bahan Restorasi *</label><select name="restorasi_id" id="edit_restorasi_id" required>
-<?php foreach($masterRestorasi as $r): ?><option value="<?php echo (int)$r['id']; ?>" data-harga="<?php echo h($r['harga_terakhir']); ?>" data-stok="<?php echo h($r['stok']); ?>" data-satuan="<?php echo h($r['satuan']); ?>"><?php echo h($r['kode'].' - '.$r['nama'].' | Stok: '.rupiah($r['stok']).' '.$r['satuan']); ?></option><?php endforeach; ?>
-</select></div>
-<div class="form-field"><label>Qty *</label><input name="qty" id="edit_rst_qty" required></div>
-<div class="form-field"><label>Harga Per Unit</label><input name="harga" id="edit_rst_harga" value="0"></div>
-<div class="form-field full"><label>Keterangan</label><textarea name="keterangan" id="edit_rst_keterangan"></textarea></div>
-</div></div>
-<div class="modal-footer"><button type="button" class="btn-secondary" data-close>Batal</button><button class="btn-primary">Update</button></div>
-</form></div></div>
+<div class="modal" id="modalServiceEdit">
+<div class="modal-dialog"><div class="modal-header"><strong>Edit Service</strong><button class="modal-close" data-close>×</button></div>
+<form method="post"><input type="hidden" name="csrf_token" value="<?php echo h($csrf); ?>"><input type="hidden" name="action" value="edit_service"><input type="hidden" name="service_id" id="service_id">
+<div class="modal-body"><div class="form-grid"><div class="form-field"><label>Nama Barang / Jasa *</label><input name="nama_barang" id="service_nama" required></div><div class="form-field"><label>Tanggal</label><input type="date" name="tanggal" id="service_tanggal"></div><div class="form-field"><label>Harga</label><input name="harga" id="service_harga"></div><div class="form-field"><label>Qty</label><input name="qty" id="service_qty"></div></div></div>
+<div class="modal-footer"><button type="button" class="btn-secondary" data-close>Batal</button><button class="btn-primary">Update</button></div></form></div></div>
 
 <div class="modal" id="modalJasa">
-<div class="modal-dialog"><div class="modal-header"><strong>Tambah Jasa Pembentuk Unit</strong><button class="modal-close" data-close>×</button></div>
+<div class="modal-dialog"><div class="modal-header"><strong>Tambah Finishing</strong><button class="modal-close" data-close>×</button></div>
 <form method="post"><input type="hidden" name="csrf_token" value="<?php echo h($csrf); ?>"><input type="hidden" name="action" value="add_jasa">
 <div class="modal-body"><?php if($openModal==='modalJasa'&&$error): ?><div class="alert error"><?php echo h($error); ?></div><?php endif; ?>
-<div class="form-grid"><div class="form-field"><label>Jenis Jasa *</label><input name="jenis_jasa" required></div><div class="form-field"><label>Tanggal</label><input type="date" name="tanggal" value="<?php echo date('Y-m-d'); ?>"></div><div class="form-field"><label>Qty</label><input name="qty" value="1"></div><div class="form-field"><label>Biaya</label><input name="biaya" value="0"></div><div class="form-field full"><label>Keterangan</label><textarea name="keterangan"></textarea></div></div></div>
+<div class="form-grid"><div class="form-field"><label>Nama Barang / Jasa *</label><input name="jenis_jasa" required></div><div class="form-field"><label>Tanggal</label><input type="date" name="tanggal" value="<?php echo date('Y-m-d'); ?>"></div><div class="form-field"><label>Qty</label><input name="qty" value="1"></div><div class="form-field"><label>Harga</label><input name="biaya" value="0"></div><div class="form-field full"><label>Keterangan</label><textarea name="keterangan"></textarea></div></div></div>
 <div class="modal-footer"><button type="button" class="btn-secondary" data-close>Batal</button><button class="btn-primary">Simpan</button></div></form></div></div>
 
 <div class="modal" id="modalJasaEdit">
-<div class="modal-dialog"><div class="modal-header"><strong>Edit Jasa Pembentuk Unit</strong><button class="modal-close" data-close>×</button></div>
+<div class="modal-dialog"><div class="modal-header"><strong>Edit Finishing</strong><button class="modal-close" data-close>×</button></div>
 <form method="post"><input type="hidden" name="csrf_token" value="<?php echo h($csrf); ?>"><input type="hidden" name="action" value="edit_jasa"><input type="hidden" name="jasa_id" id="jasa_id">
-<div class="modal-body"><div class="form-grid"><div class="form-field"><label>Jenis Jasa *</label><input name="jenis_jasa" id="jasa_jenis" required></div><div class="form-field"><label>Tanggal</label><input type="date" name="tanggal" id="jasa_tanggal"></div><div class="form-field"><label>Qty</label><input name="qty" id="jasa_qty"></div><div class="form-field"><label>Biaya</label><input name="biaya" id="jasa_biaya"></div><div class="form-field full"><label>Keterangan</label><textarea name="keterangan" id="jasa_keterangan"></textarea></div></div></div>
+<div class="modal-body"><div class="form-grid"><div class="form-field"><label>Nama Barang / Jasa *</label><input name="jenis_jasa" id="jasa_jenis" required></div><div class="form-field"><label>Tanggal</label><input type="date" name="tanggal" id="jasa_tanggal"></div><div class="form-field"><label>Qty</label><input name="qty" id="jasa_qty"></div><div class="form-field"><label>Harga</label><input name="biaya" id="jasa_biaya"></div><div class="form-field full"><label>Keterangan</label><textarea name="keterangan" id="jasa_keterangan"></textarea></div></div></div>
 <div class="modal-footer"><button type="button" class="btn-secondary" data-close>Batal</button><button class="btn-primary">Update</button></div></form></div></div>
 
 <script>
@@ -1440,23 +1224,24 @@ require __DIR__ . '/../includes/header.php';
             if(id==='modalSparepartEdit'){
                 document.getElementById('sp_rel_id').value=this.dataset.id||'';
                 document.getElementById('edit_sparepart_id').value=this.dataset.sparepart||'';
-                document.getElementById('edit_sp_qty').value=this.dataset.qty||'';
+                document.getElementById('edit_sp_tanggal').value=this.dataset.tanggal||'';
+                document.getElementById('edit_sp_qty').value=fmt(this.dataset.qty||0);
                 document.getElementById('edit_sp_keterangan').value=this.dataset.keterangan||'';
                 document.getElementById('edit_sp_harga').value=fmt(this.dataset.harga||0);
             }
-            if(id==='modalRestorasiEdit'){
-                document.getElementById('rst_rel_id').value=this.dataset.id||'';
-                document.getElementById('edit_restorasi_id').value=this.dataset.restorasi||'';
-                document.getElementById('edit_rst_qty').value=this.dataset.qty||'';
-                document.getElementById('edit_rst_keterangan').value=this.dataset.keterangan||'';
-                document.getElementById('edit_rst_harga').value=fmt(this.dataset.harga||0);
+            if(id==='modalServiceEdit'){
+                document.getElementById('service_id').value=this.dataset.id||'';
+                document.getElementById('service_nama').value=this.dataset.nama||'';
+                document.getElementById('service_tanggal').value=this.dataset.tanggal||'';
+                document.getElementById('service_harga').value=fmt(this.dataset.harga||0);
+                document.getElementById('service_qty').value=fmt(this.dataset.qty||1);
             }
             if(id==='modalJasaEdit'){
                 document.getElementById('jasa_id').value=this.dataset.id||'';
                 document.getElementById('jasa_jenis').value=this.dataset.jenis||'';
                 document.getElementById('jasa_keterangan').value=this.dataset.keterangan||'';
-                document.getElementById('jasa_qty').value=this.dataset.qty||'';
-                document.getElementById('jasa_biaya').value=this.dataset.biaya||'';
+                document.getElementById('jasa_qty').value=fmt(this.dataset.qty||0);
+                document.getElementById('jasa_biaya').value=fmt(this.dataset.biaya||0);
                 document.getElementById('jasa_tanggal').value=this.dataset.tanggal||'';
             }
         });
@@ -1477,24 +1262,8 @@ require __DIR__ . '/../includes/header.php';
         });
     }
 
-    const addRstSel=document.getElementById('add_restorasi_id');
-    if(addRstSel){
-        addRstSel.addEventListener('change',function(){
-            const o=this.options[this.selectedIndex];
-            document.getElementById('add_rst_harga').value=fmt(o?.dataset.harga||0);
-            document.getElementById('add_rst_stok').textContent=o.value?'Stok tersedia: '+fmt(o.dataset.stok||0)+' '+(o.dataset.satuan||''):'';
-        });
-    }
-
-    function updateEditRestorasiPrice(){
-        const s=document.getElementById('edit_restorasi_id');
-        if(!s)return;
-        const o=s.options[s.selectedIndex];
-        document.getElementById('edit_rst_harga').value=fmt(o?.dataset.harga||0);
-    }
-    const editRstSel=document.getElementById('edit_restorasi_id');
-    if(editRstSel)editRstSel.addEventListener('change',updateEditRestorasiPrice);
-
+    
+    
     function updateEditPrice(){
         const s=document.getElementById('edit_sparepart_id');
         if(!s)return;
