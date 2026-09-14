@@ -457,6 +457,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->execute([(int)$sale['alat_berat_id']]);
             }
 
+            $stmt = $pdo->prepare("DELETE FROM pemasukan WHERE penjualan_id = ?");
+            $stmt->execute([$saleId]);
+
             $stmt = $pdo->prepare("DELETE FROM penjualan WHERE id = ? LIMIT 1");
             $stmt->execute([$saleId]);
 
