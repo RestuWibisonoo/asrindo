@@ -72,7 +72,7 @@ function getUnitHpp(PDO $pdo, int $alatBeratId): float
             ), 0)
             +
             COALESCE((
-                SELECT SUM(qty * harga)
+                SELECT SUM(finishing + suku_cadang + jasa)
                 FROM alat_berat_perawatan
                 WHERE alat_berat_id = ?
             ), 0)
@@ -456,10 +456,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ");
                 $stmt->execute([(int)$sale['alat_berat_id']]);
             }
-
-            // Hapus data pemasukan yang terkait dengan penjualan ini (karena constraint tidak ON DELETE CASCADE)
-            $stmt = $pdo->prepare("DELETE FROM pemasukan WHERE penjualan_id = ?");
-            $stmt->execute([$saleId]);
 
             $stmt = $pdo->prepare("DELETE FROM penjualan WHERE id = ? LIMIT 1");
             $stmt->execute([$saleId]);

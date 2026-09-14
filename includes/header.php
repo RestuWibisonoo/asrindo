@@ -47,7 +47,8 @@ $adminRole = isset($_SESSION['admin_role']) ? $_SESSION['admin_role'] : 'ADMIN';
             <div class="nav-dropdown">
                 <button type="button" class="nav-dropdown-button">Transaksi <span>⌄</span></button>
                 <div class="nav-dropdown-menu">
-                    <a href="<?php echo $adminBase; ?>admin/penjualan.php">Penjualan</a>
+                    <a href="<?php echo $adminBase; ?>admin/penjualan.php">Penjualan Alat Berat</a>
+                    <a href="<?php echo $adminBase; ?>admin/penjualan_sparepart.php">Penjualan Sparepart</a>
                     <a href="<?php echo $adminBase; ?>admin/pembelian_alat_berat.php">Pembelian Alat Berat</a>
                     <a href="<?php echo $adminBase; ?>admin/pembelian_sparepart.php">Pembelian Sparepart</a>
                     <a href="<?php echo $adminBase; ?>admin/pembelian_restorasi.php">Pembelian Bahan Restorasi</a>
