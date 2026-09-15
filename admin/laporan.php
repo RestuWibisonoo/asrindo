@@ -706,7 +706,12 @@ foreach ($incomeDetailRows as $row) {
     ];
 }
 
-$profitCogsRows = [];
+$profitCogsGroups = [
+    'Pembelian Alat Berat' => 0.0,
+    'Pembelian Sparepart' => 0.0,
+    'Pembayaran Pembelian Alat Berat' => 0.0,
+    'Pembayaran Pembelian Sparepart' => 0.0,
+];
 $profitOperatingRows = [];
 $investmentRows = [];
 foreach ($expenseDetailRows as $row) {
@@ -720,17 +725,12 @@ foreach ($expenseDetailRows as $row) {
 
     if ($row['sumber'] === 'PEMBELIAN') {
         if (!empty($row['pembelian_pembayaran_id'])) {
-            $purchaseNo = trim((string) $row['nomor_pembelian_alat_berat']);
-            $label = 'Pembelian Alat Berat' . ($purchaseNo !== '' ? ' ' . $purchaseNo : '');
+            $profitCogsGroups['Pembayaran Pembelian Alat Berat'] += (float) $row['nominal'];
+        } elseif (!empty($row['pembelian_sparepart_id'])) {
+            $profitCogsGroups['Pembayaran Pembelian Sparepart'] += (float) $row['nominal'];
         } else {
-            $purchaseNo = trim((string) $row['nomor_pembelian_sparepart']);
-            $label = 'Pembelian Sparepart' . ($purchaseNo !== '' ? ' ' . $purchaseNo : '');
+            $profitCogsGroups['Pembelian Alat Berat'] += (float) $row['nominal'];
         }
-
-        $profitCogsRows[] = [
-            'label' => $label,
-            'nominal' => (float) $row['nominal'],
-        ];
         continue;
     }
 
@@ -740,8 +740,19 @@ foreach ($expenseDetailRows as $row) {
     ];
 }
 
+$profitCogsRows = [];
+foreach ($profitCogsGroups as $label => $nominal) {
+    if ($nominal > 0) {
+        $profitCogsRows[] = [
+            'label' => $label,
+            'nominal' => $nominal,
+        ];
+    }
+}
+
 $positionUnitRows = [];
 $positionSparepartRows = [];
+$positionRestorasiRows = [];
 try {
     $positionUnits = $pdo->query("SELECT id, kode, tipe FROM alat_berat ORDER BY kode ASC")->fetchAll(PDO::FETCH_ASSOC);
     $hppByUnit = [];
@@ -797,9 +808,31 @@ try {
         ) lp ON lp.sparepart_id = s.id
         ORDER BY s.kode ASC
     ")->fetchAll(PDO::FETCH_ASSOC);
+
+    $positionRestorasiRows = $pdo->query("
+        SELECT r.kode, r.stok, COALESCE(lp.harga_terakhir, 0) AS harga_terakhir
+        FROM restorasi r
+        LEFT JOIN (
+            SELECT d.restorasi_id, d.harga AS harga_terakhir
+            FROM pembelian_restorasi_detail d
+            INNER JOIN pembelian_restorasi p ON p.id = d.pembelian_id
+            INNER JOIN (
+                SELECT d2.restorasi_id,
+                    MAX(CONCAT(LPAD(p2.tanggal, 10, '0'), LPAD(p2.id, 10, '0'), LPAD(d2.id, 10, '0'))) AS latest_key
+                FROM pembelian_restorasi_detail d2
+                INNER JOIN pembelian_restorasi p2 ON p2.id = d2.pembelian_id
+                WHERE UPPER(COALESCE(p2.status, '')) <> 'BATAL'
+                GROUP BY d2.restorasi_id
+            ) latest ON latest.restorasi_id = d.restorasi_id
+                AND latest.latest_key = CONCAT(LPAD(p.tanggal, 10, '0'), LPAD(p.id, 10, '0'), LPAD(d.id, 10, '0'))
+            WHERE UPPER(COALESCE(p.status, '')) <> 'BATAL'
+        ) lp ON lp.restorasi_id = r.id
+        ORDER BY r.kode ASC
+    ")->fetchAll(PDO::FETCH_ASSOC);
 } catch (Throwable $e) {
     $positionUnitRows = [];
     $positionSparepartRows = [];
+    $positionRestorasiRows = [];
 }
 
 $positionUnitTotal = array_sum(array_column($positionUnitRows, 'nominal'));
@@ -807,7 +840,11 @@ $positionSparepartTotal = 0.0;
 foreach ($positionSparepartRows as $row) {
     $positionSparepartTotal += (float) $row['stok'] * (float) $row['harga_terakhir'];
 }
-$asetTetapRinci = $positionUnitTotal + $positionSparepartTotal;
+$positionRestorasiTotal = 0.0;
+foreach ($positionRestorasiRows as $row) {
+    $positionRestorasiTotal += (float) $row['stok'] * (float) $row['harga_terakhir'];
+}
+$asetTetapRinci = $positionUnitTotal + $positionSparepartTotal + $positionRestorasiTotal;
 $asetTetap = $asetTetapRinci;
 $totalAset = $kasAkhirPeriode + $piutangPenjualan + $asetTetap;
 $totalEkuitas = $totalAset - $totalLiabilitas;
@@ -1811,6 +1848,15 @@ require_once __DIR__ . '/../includes/header.php';
         text-align: left !important
     }
 
+    .statement-table .subsection td {
+        padding-top: 6px;
+        padding-bottom: 3px;
+        font-weight: 700;
+        color: #526b8d;
+        text-align: left !important;
+        border-bottom: 0
+    }
+
     .statement-print {
         display: none
     }
@@ -2170,17 +2216,33 @@ require_once __DIR__ . '/../includes/header.php';
                             <td>Piutang Penjualan</td>
                             <td><?php echo rupiah($piutangPenjualan); ?></td>
                         </tr>
+                        <tr class="subsection">
+                            <td colspan="2">UNIT ALAT BERAT</td>
+                        </tr>
                         <?php foreach ($positionUnitRows as $row): ?>
                             <tr class="indent">
                                 <td><?php echo h($row['label']); ?></td>
                                 <td><?php echo rupiah($row['nominal']); ?></td>
                             </tr>
                         <?php endforeach; ?>
+                        <tr class="subsection">
+                            <td colspan="2">SPAREPART</td>
+                        </tr>
                         <?php foreach ($positionSparepartRows as $row): ?>
                             <?php $stockValue = (float) $row['stok'] * (float) $row['harga_terakhir']; ?>
                             <tr class="indent">
                                 <td><?php echo h($row['kode']); ?></td>
                                 <td><?php echo rupiah($stockValue); ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                        <tr class="subsection">
+                            <td colspan="2">BAHAN RESTORASI</td>
+                        </tr>
+                        <?php foreach ($positionRestorasiRows as $row): ?>
+                            <?php $restorationValue = (float) $row['stok'] * (float) $row['harga_terakhir']; ?>
+                            <tr class="indent">
+                                <td><?php echo h($row['kode']); ?></td>
+                                <td><?php echo rupiah($restorationValue); ?></td>
                             </tr>
                         <?php endforeach; ?>
                         <tr class="total">
