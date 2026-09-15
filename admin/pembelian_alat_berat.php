@@ -204,6 +204,37 @@ foreach ($purchases as $p) {
     $totalOutstanding += max(0, (float)$p['total'] - (float)$p['sudah_dibayar']);
 }
 
+$extraHead = <<<'HTML'
+<style>
+.purchase-panel{overflow:visible}
+.purchase-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:0 0 16px}
+.purchase-stat-card{padding:15px 16px;border:1px solid #dfe5ed;border-radius:6px;background:#fff;box-shadow:0 1px 2px rgba(23,45,78,.04)}
+.purchase-stat-card span{display:block;color:#718096;font-size:11px;margin-bottom:7px}
+.purchase-stat-card strong{display:block;color:#183052;font-size:17px;line-height:1.25}
+.panel-subtitle{display:block;margin-top:3px;color:#718096;font-size:12px}
+.purchase-toolbar{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;padding:15px 16px;border-bottom:1px solid #dfe5ed}
+.purchase-search{flex:1;max-width:480px}.purchase-page-size{width:130px}
+.purchase-toolbar label{display:block;margin-bottom:6px;color:#52657f;font-size:11px}
+.purchase-toolbar input,.purchase-toolbar select,.purchase-field input,.purchase-field select,.purchase-field textarea{width:100%;box-sizing:border-box;border:1px solid #bdcbe0;border-radius:4px;background:#fff;color:#172d4e;padding:8px 10px;outline:none;font-size:12px}
+.purchase-toolbar input,.purchase-toolbar select,.purchase-field input,.purchase-field select{height:36px}
+.purchase-field textarea{resize:vertical;min-height:80px}
+.purchase-table{min-width:1120px}.purchase-table th,.purchase-table td{vertical-align:middle}
+.purchase-filter-row th{padding:7px;background:#f7f9fc}.purchase-filter-row input{width:100%;height:30px;box-sizing:border-box;border:1px solid #bdcbe0;border-radius:4px;padding:4px 6px;font-size:10px;color:#172d4e;outline:none}
+.money-cell{text-align:right;white-space:nowrap}.paid-cell{font-weight:600}.unit-count{color:#0d6efd;font-size:12px}
+.purchase-badge{display:inline-block;padding:3px 7px;border-radius:4px;font-size:10px;font-weight:600}.badge-info{background:#06b6d4;color:#fff}.badge-success{background:#10b981;color:#fff}.badge-danger{background:#ef4444;color:#fff}
+.action-cell{white-space:nowrap}.btn-small{display:inline-flex;align-items:center;justify-content:center;min-width:50px;height:30px;padding:0 10px;border:1px solid #bdcbe0;border-radius:4px;background:#fff;color:#52657f;font-size:11px;cursor:pointer;text-decoration:none;box-sizing:border-box}.btn-small:hover{border-color:#0d6efd;color:#0d6efd}
+.purchase-table-footer{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:12px 16px;color:#718096;font-size:12px}.purchase-pagination{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}.purchase-pagination button{min-width:34px;height:32px;border:1px solid #d4deeb;border-radius:4px;background:#fff;color:#52657f;cursor:pointer;font-size:11px}.purchase-pagination button.active{border-color:#0d6efd;background:#0d6efd;color:#fff}.purchase-pagination button:disabled{cursor:not-allowed;opacity:.5}
+.purchase-modal{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;padding:18px;box-sizing:border-box;background:rgba(23,45,78,.55)}.purchase-modal.show{display:flex}.purchase-modal-box{width:min(760px,100%);max-height:calc(100vh - 36px);overflow-y:auto;border-radius:6px;background:#fff;box-shadow:0 15px 45px rgba(0,0,0,.18)}
+.purchase-modal-header{display:flex;align-items:flex-start;justify-content:space-between;gap:15px;padding:14px 16px;border-bottom:1px solid #dfe5ed}.purchase-modal-header h3{margin:0;color:#183052;font-size:15px}.purchase-modal-header p{margin:5px 0 0;color:#718096;font-size:11px}.purchase-modal-close{width:34px;height:34px;border:0;background:transparent;color:#718096;font-size:25px;cursor:pointer}
+.purchase-modal-body{padding:18px 16px}.purchase-section-title{margin:2px 0 14px;padding-bottom:7px;border-bottom:1px solid #dfe5ed;color:#183052;font-size:12px;font-weight:600}.purchase-section-title:not(:first-child){margin-top:20px}
+.purchase-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.purchase-field{min-width:0}.purchase-field-full{grid-column:1/-1}.purchase-field label{display:block;margin-bottom:6px;color:#183052;font-size:11px}.purchase-field label span{color:#dc3545}
+.purchase-modal-footer{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:12px 16px;border-top:1px solid #dfe5ed}.btn-primary,.btn-secondary{min-height:36px;padding:0 15px;border-radius:4px;font-size:11px;cursor:pointer}.btn-primary{border:0;background:#0d6efd;color:#fff}.btn-secondary{border:0;background:#718096;color:#fff}
+@media(max-width:1000px){.purchase-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:800px){.purchase-toolbar{align-items:stretch;flex-direction:column}.purchase-search,.purchase-page-size{width:100%;max-width:none}.purchase-table-footer{align-items:flex-start;flex-direction:column}.purchase-pagination{justify-content:flex-start}.purchase-form-grid{grid-template-columns:1fr}.purchase-field-full{grid-column:auto}.purchase-modal{padding:10px}.purchase-modal-box{max-height:calc(100vh - 20px)}}
+@media(max-width:520px){.purchase-stats{grid-template-columns:1fr}}
+</style>
+HTML;
+
 require __DIR__ . '/../includes/header.php';
 ?>
 
@@ -399,34 +430,7 @@ require __DIR__ . '/../includes/header.php';
     </div>
 </div>
 
-<style>
-.purchase-panel{overflow:visible}
-.purchase-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:0 0 16px}
-.purchase-stat-card{padding:15px 16px;border:1px solid #dfe5ed;border-radius:6px;background:#fff;box-shadow:0 1px 2px rgba(23,45,78,.04)}
-.purchase-stat-card span{display:block;color:#718096;font-size:11px;margin-bottom:7px}
-.purchase-stat-card strong{display:block;color:#183052;font-size:17px;line-height:1.25}
-.panel-subtitle{display:block;margin-top:3px;color:#718096;font-size:12px}
-.purchase-toolbar{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;padding:15px 16px;border-bottom:1px solid #dfe5ed}
-.purchase-search{flex:1;max-width:480px}.purchase-page-size{width:130px}
-.purchase-toolbar label{display:block;margin-bottom:6px;color:#52657f;font-size:11px}
-.purchase-toolbar input,.purchase-toolbar select,.purchase-field input,.purchase-field select,.purchase-field textarea{width:100%;box-sizing:border-box;border:1px solid #bdcbe0;border-radius:4px;background:#fff;color:#172d4e;padding:8px 10px;outline:none;font-size:12px}
-.purchase-toolbar input,.purchase-toolbar select,.purchase-field input,.purchase-field select{height:36px}
-.purchase-field textarea{resize:vertical;min-height:80px}
-.purchase-table{min-width:1120px}.purchase-table th,.purchase-table td{vertical-align:middle}
-.purchase-filter-row th{padding:7px;background:#f7f9fc}.purchase-filter-row input{width:100%;height:30px;box-sizing:border-box;border:1px solid #bdcbe0;border-radius:4px;padding:4px 6px;font-size:10px;color:#172d4e;outline:none}
-.money-cell{text-align:right;white-space:nowrap}.paid-cell{font-weight:600}.unit-count{color:#0d6efd;font-size:12px}
-.purchase-badge{display:inline-block;padding:3px 7px;border-radius:4px;font-size:10px;font-weight:600}.badge-info{background:#06b6d4;color:#fff}.badge-success{background:#10b981;color:#fff}.badge-danger{background:#ef4444;color:#fff}
-.action-cell{white-space:nowrap}.btn-small{display:inline-flex;align-items:center;justify-content:center;min-width:50px;height:30px;padding:0 10px;border:1px solid #bdcbe0;border-radius:4px;background:#fff;color:#52657f;font-size:11px;cursor:pointer;text-decoration:none;box-sizing:border-box}.btn-small:hover{border-color:#0d6efd;color:#0d6efd}
-.purchase-table-footer{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:12px 16px;color:#718096;font-size:12px}.purchase-pagination{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}.purchase-pagination button{min-width:34px;height:32px;border:1px solid #d4deeb;border-radius:4px;background:#fff;color:#52657f;cursor:pointer;font-size:11px}.purchase-pagination button.active{border-color:#0d6efd;background:#0d6efd;color:#fff}.purchase-pagination button:disabled{cursor:not-allowed;opacity:.5}
-.purchase-modal{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;padding:18px;box-sizing:border-box;background:rgba(23,45,78,.55)}.purchase-modal.show{display:flex}.purchase-modal-box{width:min(760px,100%);max-height:calc(100vh - 36px);overflow-y:auto;border-radius:6px;background:#fff;box-shadow:0 15px 45px rgba(0,0,0,.18)}
-.purchase-modal-header{display:flex;align-items:flex-start;justify-content:space-between;gap:15px;padding:14px 16px;border-bottom:1px solid #dfe5ed}.purchase-modal-header h3{margin:0;color:#183052;font-size:15px}.purchase-modal-header p{margin:5px 0 0;color:#718096;font-size:11px}.purchase-modal-close{width:34px;height:34px;border:0;background:transparent;color:#718096;font-size:25px;cursor:pointer}
-.purchase-modal-body{padding:18px 16px}.purchase-section-title{margin:2px 0 14px;padding-bottom:7px;border-bottom:1px solid #dfe5ed;color:#183052;font-size:12px;font-weight:600}.purchase-section-title:not(:first-child){margin-top:20px}
-.purchase-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.purchase-field{min-width:0}.purchase-field-full{grid-column:1/-1}.purchase-field label{display:block;margin-bottom:6px;color:#183052;font-size:11px}.purchase-field label span{color:#dc3545}
-.purchase-modal-footer{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:12px 16px;border-top:1px solid #dfe5ed}.btn-primary,.btn-secondary{min-height:36px;padding:0 15px;border-radius:4px;font-size:11px;cursor:pointer}.btn-primary{border:0;background:#0d6efd;color:#fff}.btn-secondary{border:0;background:#718096;color:#fff}
-@media(max-width:1000px){.purchase-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:800px){.purchase-toolbar{align-items:stretch;flex-direction:column}.purchase-search,.purchase-page-size{width:100%;max-width:none}.purchase-table-footer{align-items:flex-start;flex-direction:column}.purchase-pagination{justify-content:flex-start}.purchase-form-grid{grid-template-columns:1fr}.purchase-field-full{grid-column:auto}.purchase-modal{padding:10px}.purchase-modal-box{max-height:calc(100vh - 20px)}}
-@media(max-width:520px){.purchase-stats{grid-template-columns:1fr}}
-</style>
+
 
 <script>
 (function(){
