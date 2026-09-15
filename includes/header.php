@@ -24,6 +24,7 @@ $adminRole = isset($_SESSION['admin_role']) ? $_SESSION['admin_role'] : 'ADMIN';
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?php echo htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8'); ?> - ASRINDO</title>
     <link rel="stylesheet" href="<?php echo htmlspecialchars($adminBase, ENT_QUOTES, 'UTF-8'); ?>assets/css/admin.css">
+    <?php if (!empty($extraHead)) { echo $extraHead; } ?>
 </head>
 <body class="admin-page">
 
