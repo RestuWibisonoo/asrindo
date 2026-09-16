@@ -111,8 +111,9 @@ $totalPemasukan = (float) ($incomeSummary['total'] ?? 0);
 | PENGELUARAN AKTUAL
 |--------------------------------------------------------------------------
 | PEMBELIAN:
-|   - Alat Berat melalui pembelian_pembayaran
-|   - Sparepart melalui pembelian_sparepart
+|   - Pembelian Alat Berat melalui pengeluaran yang berasal dari pembelian_pembayaran
+|   - Pembelian Sparepart melalui pengeluaran yang berasal dari pembelian_sparepart
+|   - Keduanya digabung menjadi satu kelompok Belanja Pembelian
 |
 | NON_PEMBELIAN:
 |   - dikelompokkan berdasarkan kategori_keuangan.kelompok_laporan
@@ -288,6 +289,14 @@ $stmt = $pdo->prepare("
 $stmt->execute([$tanggalAkhir]);
 $kasKeluarSampaiTanggal = (float) $stmt->fetchColumn();
 $kasAkhirPeriode = $kasMasukSampaiTanggal - $kasKeluarSampaiTanggal;
+$stmt = $pdo->prepare("SELECT COALESCE(SUM(nominal), 0) FROM pemasukan WHERE tanggal < ?");
+$stmt->execute([$tanggalAwal]);
+$kasMasukSebelumPeriode = (float) $stmt->fetchColumn();
+$stmt = $pdo->prepare("SELECT COALESCE(SUM(nominal), 0) FROM pengeluaran WHERE tanggal < ?");
+$stmt->execute([$tanggalAwal]);
+$kasKeluarSebelumPeriode = (float) $stmt->fetchColumn();
+$kasAwalPeriode = $kasMasukSebelumPeriode - $kasKeluarSebelumPeriode;
+$arusKasPeriode = $totalPemasukan - $totalPengeluaran;
 $arusKasOperasional = $totalPemasukan
     - $belanjaPembelian
     - $bebanOperasional
@@ -313,9 +322,7 @@ $stmt = $pdo->prepare("
 $stmt->execute([$tanggalAkhir]);
 $totalKewajibanPembelian = (float) $stmt->fetchColumn();
 
-$totalAset = $kasAkhirPeriode + $piutangPenjualan + $asetTetap;
 $totalLiabilitas = max(0, $totalKewajibanPembelian - $totalBayarPembelianAlat);
-$totalEkuitas = $totalAset - $totalLiabilitas;
 
 /*
 |--------------------------------------------------------------------------
@@ -416,7 +423,6 @@ $labaRugiPeriode = $profitValue
     + (float) $incomeBySource['NON_PENJUALAN']
     - $bebanOperasional
     - $pengeluaranLainnya;
-$modalAwal = $totalEkuitas - $labaRugiKumulatif;
 
 /*
 |--------------------------------------------------------------------------
@@ -668,171 +674,162 @@ $stmt = $pdo->prepare("
 $stmt->execute([$tanggalAwal, $tanggalAkhir]);
 $expenseDetailRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+/*
+ * ========================================================================
+ * LABA RUGI BERBASIS AKRUAL
+ * ========================================================================
+ * Penjualan = nilai transaksi yang terjadi pada periode, bukan pembayaran.
+ * HPP = HPP yang tersimpan pada detail penjualan, hanya untuk barang yang
+ *       benar-benar terjual pada periode tersebut.
+ * Pembayaran pembelian TIDAK masuk HPP. Ia hanya masuk arus kas.
+ */
 $profitIncomeRows = [];
-$profitSparepartIndex = [];
-foreach ($incomeDetailRows as $row) {
-    if ($row['sumber'] === 'PENJUALAN') {
-        $sparepartDetail = trim((string) $row['detail_penjualan_sparepart']);
-        $detail = trim((string) $row['detail_penjualan']);
+$profitCogsRows = [];
+$profitOperatingRows = [];
+$investmentRows = [];
 
-        if ($sparepartDetail !== '') {
-            $sparepartGroupKey = 'PENJUALAN_SPAREPART';
-            if (!isset($profitSparepartIndex[$sparepartGroupKey])) {
-                $profitSparepartIndex[$sparepartGroupKey] = count($profitIncomeRows);
-                $profitIncomeRows[] = [
-                    'label' => 'Penjualan Sparepart',
-                    'nominal' => 0.0,
-                ];
-            }
-
-            $profitIncomeRows[$profitSparepartIndex[$sparepartGroupKey]]['nominal'] += (float) $row['nominal'];
-            continue;
-        }
-
-        $label = $detail !== ''
-            ? $detail
-            : ($row['nomor_penjualan'] ?: 'Pendapatan Penjualan');
-
-        if (!empty($row['termin_ke'])) {
-            $label .= ' Termin ' . (int) $row['termin_ke'];
-        }
-    } else {
-        $label = $row['kategori_nama'] ?: ($row['jenis_pembayaran'] ?: 'Pendapatan Non Penjualan');
-    }
-
+/* Pendapatan penjualan alat berat. */
+$stmt = $pdo->prepare("\n    SELECT\n        p.id,\n        p.tanggal,\n        p.nomor_penjualan,\n        COALESCE(SUM(pd.subtotal), 0) AS subtotal\n    FROM penjualan p\n    INNER JOIN penjualan_detail pd ON pd.penjualan_id = p.id\n    WHERE p.tanggal BETWEEN ? AND ?\n      AND UPPER(COALESCE(p.status, '')) NOT IN ('DRAFT', 'BATAL')\n    GROUP BY p.id, p.tanggal, p.nomor_penjualan\n    ORDER BY p.tanggal ASC, p.id ASC\n");
+$stmt->execute([$tanggalAwal, $tanggalAkhir]);
+foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+    $label = trim((string) $row['nomor_penjualan']);
     $profitIncomeRows[] = [
-        'label' => $label,
-        'nominal' => (float) $row['nominal'],
+        'label' => $label !== '' ? 'Penjualan Alat Berat ' . $label : 'Penjualan Alat Berat',
+        'nominal' => (float) $row['subtotal'],
     ];
 }
 
-$profitCogsGroups = [
-    'Pembelian Alat Berat' => 0.0,
-    'Pembelian Sparepart' => 0.0,
-    'Pembayaran Pembelian Alat Berat' => 0.0,
-    'Pembayaran Pembelian Sparepart' => 0.0,
-];
-$profitOperatingRows = [];
-$investmentRows = [];
+/* Pendapatan penjualan sparepart. */
+try {
+    $stmt = $pdo->prepare("\n        SELECT\n            p.id,\n            p.tanggal,\n            p.nomor_penjualan,\n            COALESCE(SUM(pd.subtotal), 0) AS subtotal\n        FROM penjualan_sparepart p\n        INNER JOIN penjualan_sparepart_detail pd ON pd.penjualan_id = p.id\n        WHERE p.tanggal BETWEEN ? AND ?\n          AND UPPER(COALESCE(p.status, '')) NOT IN ('DRAFT', 'BATAL')\n        GROUP BY p.id, p.tanggal, p.nomor_penjualan\n        ORDER BY p.tanggal ASC, p.id ASC\n    ");
+    $stmt->execute([$tanggalAwal, $tanggalAkhir]);
+    $totalPenjualanSparepart = 0.0;
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $totalPenjualanSparepart += (float) $row['subtotal'];
+    }
+    if ($totalPenjualanSparepart > 0) {
+        $profitIncomeRows[] = [
+            'label' => 'Penjualan Sparepart',
+            'nominal' => $totalPenjualanSparepart,
+        ];
+    }
+} catch (Throwable $e) {
+    /* Tabel penjualan sparepart tetap opsional terhadap laporan. */
+}
+
+/* Pendapatan non-penjualan tetap berasal dari kas masuk aktual. */
+foreach ($incomeDetailRows as $row) {
+    if ($row['sumber'] !== 'PENJUALAN') {
+        $profitIncomeRows[] = [
+            'label' => $row['kategori_nama'] ?: ($row['jenis_pembayaran'] ?: 'Pendapatan Non Penjualan'),
+            'nominal' => (float) $row['nominal'],
+        ];
+    }
+}
+
+/* HPP alat berat: hanya detail penjualan pada periode berjalan. */
+$stmt = $pdo->prepare("\n    SELECT\n        p.nomor_penjualan,\n        ab.kode,\n        pd.hpp\n    FROM penjualan p\n    INNER JOIN penjualan_detail pd ON pd.penjualan_id = p.id\n    LEFT JOIN alat_berat ab ON ab.id = pd.alat_berat_id\n    WHERE p.tanggal BETWEEN ? AND ?\n      AND UPPER(COALESCE(p.status, '')) NOT IN ('DRAFT', 'BATAL')\n      AND COALESCE(pd.hpp, 0) > 0\n    ORDER BY p.tanggal ASC, p.id ASC, pd.id ASC\n");
+$stmt->execute([$tanggalAwal, $tanggalAkhir]);
+foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+    $label = 'HPP Alat Berat';
+    if (trim((string) $row['kode']) !== '') {
+        $label .= ' ' . $row['kode'];
+    } elseif (trim((string) $row['nomor_penjualan']) !== '') {
+        $label .= ' ' . $row['nomor_penjualan'];
+    }
+    $profitCogsRows[] = [
+        'label' => $label,
+        'nominal' => (float) $row['hpp'],
+    ];
+}
+
+/* HPP sparepart: memakai nilai HPP yang sudah disimpan pada detail penjualan. */
+try {
+    $stmt = $pdo->prepare("\n        SELECT\n            p.nomor_penjualan,\n            s.kode,\n            pd.hpp\n        FROM penjualan_sparepart p\n        INNER JOIN penjualan_sparepart_detail pd ON pd.penjualan_id = p.id\n        LEFT JOIN sparepart s ON s.id = pd.sparepart_id\n        WHERE p.tanggal BETWEEN ? AND ?\n          AND UPPER(COALESCE(p.status, '')) NOT IN ('DRAFT', 'BATAL')\n          AND COALESCE(pd.hpp, 0) > 0\n        ORDER BY p.tanggal ASC, p.id ASC, pd.id ASC\n    ");
+    $stmt->execute([$tanggalAwal, $tanggalAkhir]);
+    $totalHppSparepart = 0.0;
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $totalHppSparepart += (float) $row['hpp'];
+    }
+    if ($totalHppSparepart > 0) {
+        $profitCogsRows[] = [
+            'label' => 'HPP Sparepart',
+            'nominal' => $totalHppSparepart,
+        ];
+    }
+} catch (Throwable $e) {
+    /* Tabel penjualan sparepart tetap opsional terhadap laporan. */
+}
+
+/* Pengeluaran non-pembelian: modal aset dipisahkan dari beban. */
 foreach ($expenseDetailRows as $row) {
+    if ((string) $row['sumber'] !== 'NON_PEMBELIAN') {
+        continue;
+    }
+
     if ((string) $row['kelompok_laporan'] === 'MODAL_ASET') {
         $investmentRows[] = [
             'label' => $row['kategori_nama'] ?: ($row['jenis_pengeluaran'] ?: 'Perolehan Aset Tetap'),
             'nominal' => (float) $row['nominal'],
         ];
-        continue;
-    }
-
-    if ($row['sumber'] === 'PEMBELIAN') {
-        if (!empty($row['pembelian_pembayaran_id'])) {
-            $profitCogsGroups['Pembayaran Pembelian Alat Berat'] += (float) $row['nominal'];
-        } elseif (!empty($row['pembelian_sparepart_id'])) {
-            $profitCogsGroups['Pembayaran Pembelian Sparepart'] += (float) $row['nominal'];
-        } else {
-            $profitCogsGroups['Pembelian Alat Berat'] += (float) $row['nominal'];
-        }
-        continue;
-    }
-
-    $profitOperatingRows[] = [
-        'label' => $row['kategori_nama'] ?: ($row['jenis_pengeluaran'] ?: 'Tanpa Kategori'),
-        'nominal' => (float) $row['nominal'],
-    ];
-}
-
-$profitCogsRows = [];
-foreach ($profitCogsGroups as $label => $nominal) {
-    if ($nominal > 0) {
-        $profitCogsRows[] = [
-            'label' => $label,
-            'nominal' => $nominal,
+    } else {
+        $profitOperatingRows[] = [
+            'label' => $row['kategori_nama'] ?: ($row['jenis_pengeluaran'] ?: 'Tanpa Kategori'),
+            'nominal' => (float) $row['nominal'],
         ];
     }
 }
 
+/* ========================================================================
+ * POSISI PERSEDIAAN PER TANGGAL AKHIR
+ * ======================================================================== */
 $positionUnitRows = [];
 $positionSparepartRows = [];
-$positionRestorasiRows = [];
 try {
-    $positionUnits = $pdo->query("SELECT id, kode, tipe FROM alat_berat ORDER BY kode ASC")->fetchAll(PDO::FETCH_ASSOC);
-    $hppByUnit = [];
-    $stmt = $pdo->query("
-        SELECT d.alat_berat_id,
-            d.harga_beli + (
-                COALESCE(p.biaya_bea_cukai, 0) +
-                COALESCE(p.biaya_pengiriman, 0) +
-                COALESCE(p.biaya_lain, 0)
-            ) / NULLIF((SELECT COUNT(*) FROM pembelian_alat_berat_detail d2 WHERE d2.pembelian_id = p.id), 0) AS hpp
-        FROM pembelian_alat_berat_detail d
-        INNER JOIN pembelian_alat_berat p ON p.id = d.pembelian_id
-        INNER JOIN (
-            SELECT d3.alat_berat_id,
-                MAX(CONCAT(LPAD(p3.tanggal, 10, '0'), LPAD(p3.id, 10, '0'))) AS latest_key
-            FROM pembelian_alat_berat_detail d3
-            INNER JOIN pembelian_alat_berat p3 ON p3.id = d3.pembelian_id
-            WHERE UPPER(COALESCE(p3.status, '')) <> 'BATAL'
-            GROUP BY d3.alat_berat_id
-        ) latest ON latest.alat_berat_id = d.alat_berat_id
-            AND latest.latest_key = CONCAT(LPAD(p.tanggal, 10, '0'), LPAD(p.id, 10, '0'))
-        WHERE UPPER(COALESCE(p.status, '')) <> 'BATAL'
-    ")->fetchAll(PDO::FETCH_ASSOC);
+    /* Alat berat yang sudah terjual tidak lagi menjadi persediaan. */
+    $positionUnits = $pdo->query("\n        SELECT id, kode, tipe\n        FROM alat_berat\n        ORDER BY kode ASC\n    ")->fetchAll(PDO::FETCH_ASSOC);
 
-    foreach ($stmt as $row) {
-        $hppByUnit[(int) $row['alat_berat_id']] = (float) $row['hpp'];
+    $hppByUnit = [];
+    $stmt = $pdo->prepare("\n        SELECT\n            d.alat_berat_id,\n            d.harga_beli + (\n                COALESCE(p.biaya_bea_cukai, 0) +\n                COALESCE(p.biaya_pengiriman, 0) +\n                COALESCE(p.biaya_lain, 0)\n            ) / NULLIF((\n                SELECT COUNT(*)\n                FROM pembelian_alat_berat_detail d2\n                WHERE d2.pembelian_id = p.id\n            ), 0) AS hpp\n        FROM pembelian_alat_berat_detail d\n        INNER JOIN pembelian_alat_berat p ON p.id = d.pembelian_id\n        WHERE UPPER(COALESCE(p.status, '')) <> 'BATAL'\n          AND p.tanggal <= ?\n          AND NOT EXISTS (\n              SELECT 1\n              FROM penjualan_detail sd\n              INNER JOIN penjualan sp ON sp.id = sd.penjualan_id\n              WHERE sd.alat_berat_id = d.alat_berat_id\n                AND sp.tanggal <= ?\n                AND UPPER(COALESCE(sp.status, '')) NOT IN ('DRAFT', 'BATAL')\n          )\n        ORDER BY p.tanggal DESC, p.id DESC, d.id DESC\n    ");
+    $stmt->execute([$tanggalAkhir, $tanggalAkhir]);
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $unitId = (int) $row['alat_berat_id'];
+        if (!isset($hppByUnit[$unitId])) {
+            $hppByUnit[$unitId] = (float) $row['hpp'];
+        }
     }
 
     foreach ($positionUnits as $unit) {
+        $unitId = (int) $unit['id'];
+        if (!array_key_exists($unitId, $hppByUnit)) {
+            continue;
+        }
         $positionUnitRows[] = [
             'label' => $unit['kode'],
-            'nominal' => $hppByUnit[(int) $unit['id']] ?? 0,
+            'nominal' => $hppByUnit[$unitId],
         ];
     }
 
-    $positionSparepartRows = $pdo->query("
-        SELECT s.kode, s.stok, COALESCE(lp.harga_terakhir, 0) AS harga_terakhir
-        FROM sparepart s
-        LEFT JOIN (
-            SELECT d.sparepart_id, d.harga AS harga_terakhir
-            FROM pembelian_sparepart_detail d
-            INNER JOIN pembelian_sparepart p ON p.id = d.pembelian_id
-            INNER JOIN (
-                SELECT d2.sparepart_id,
-                    MAX(CONCAT(LPAD(p2.tanggal, 10, '0'), LPAD(p2.id, 10, '0'), LPAD(d2.id, 10, '0'))) AS latest_key
-                FROM pembelian_sparepart_detail d2
-                INNER JOIN pembelian_sparepart p2 ON p2.id = d2.pembelian_id
-                WHERE UPPER(COALESCE(p2.status, '')) <> 'BATAL'
-                GROUP BY d2.sparepart_id
-            ) latest ON latest.sparepart_id = d.sparepart_id
-                AND latest.latest_key = CONCAT(LPAD(p.tanggal, 10, '0'), LPAD(p.id, 10, '0'), LPAD(d.id, 10, '0'))
-            WHERE UPPER(COALESCE(p.status, '')) <> 'BATAL'
-        ) lp ON lp.sparepart_id = s.id
-        ORDER BY s.kode ASC
-    ")->fetchAll(PDO::FETCH_ASSOC);
-
-    $positionRestorasiRows = $pdo->query("
-        SELECT r.kode, r.stok, COALESCE(lp.harga_terakhir, 0) AS harga_terakhir
-        FROM restorasi r
-        LEFT JOIN (
-            SELECT d.restorasi_id, d.harga AS harga_terakhir
-            FROM pembelian_restorasi_detail d
-            INNER JOIN pembelian_restorasi p ON p.id = d.pembelian_id
-            INNER JOIN (
-                SELECT d2.restorasi_id,
-                    MAX(CONCAT(LPAD(p2.tanggal, 10, '0'), LPAD(p2.id, 10, '0'), LPAD(d2.id, 10, '0'))) AS latest_key
-                FROM pembelian_restorasi_detail d2
-                INNER JOIN pembelian_restorasi p2 ON p2.id = d2.pembelian_id
-                WHERE UPPER(COALESCE(p2.status, '')) <> 'BATAL'
-                GROUP BY d2.restorasi_id
-            ) latest ON latest.restorasi_id = d.restorasi_id
-                AND latest.latest_key = CONCAT(LPAD(p.tanggal, 10, '0'), LPAD(p.id, 10, '0'), LPAD(d.id, 10, '0'))
-            WHERE UPPER(COALESCE(p.status, '')) <> 'BATAL'
-        ) lp ON lp.restorasi_id = r.id
-        ORDER BY r.kode ASC
-    ")->fetchAll(PDO::FETCH_ASSOC);
+    /* Nilai persediaan sparepart menggunakan moving/weighted average sederhana. */
+    $stmt = $pdo->prepare("\n        SELECT\n            s.id, s.kode, s.stok,\n            COALESCE(pq.qty_beli, 0) AS qty_beli,\n            COALESCE(pq.nilai_beli, 0) AS nilai_beli,\n            COALESCE(sq.qty_jual, 0) AS qty_jual\n        FROM sparepart s\n        LEFT JOIN (\n            SELECT d.sparepart_id,\n                   SUM(d.qty) AS qty_beli,\n                   SUM(d.subtotal) AS nilai_beli\n            FROM pembelian_sparepart_detail d\n            INNER JOIN pembelian_sparepart p ON p.id = d.pembelian_id\n            WHERE p.tanggal <= ?\n              AND UPPER(COALESCE(p.status, '')) <> 'BATAL'\n            GROUP BY d.sparepart_id\n        ) pq ON pq.sparepart_id = s.id\n        LEFT JOIN (\n            SELECT d.sparepart_id,\n                   SUM(d.qty) AS qty_jual\n            FROM penjualan_sparepart_detail d\n            INNER JOIN penjualan_sparepart p ON p.id = d.penjualan_id\n            WHERE p.tanggal <= ?\n              AND UPPER(COALESCE(p.status, '')) NOT IN ('DRAFT', 'BATAL')\n            GROUP BY d.sparepart_id\n        ) sq ON sq.sparepart_id = s.id\n        ORDER BY s.kode ASC\n    ");
+    $stmt->execute([$tanggalAkhir, $tanggalAkhir]);
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $qtyBeli = (float) $row['qty_beli'];
+        $qtyJual = (float) $row['qty_jual'];
+        $stokPeriode = max(0, $qtyBeli - $qtyJual);
+        if ($stokPeriode <= 0 || $qtyBeli <= 0) {
+            continue;
+        }
+        $avgCost = (float) $row['nilai_beli'] / $qtyBeli;
+        $positionSparepartRows[] = [
+            'kode' => $row['kode'],
+            'stok' => $stokPeriode,
+            'harga_terakhir' => $avgCost,
+        ];
+    }
 } catch (Throwable $e) {
     $positionUnitRows = [];
     $positionSparepartRows = [];
-    $positionRestorasiRows = [];
 }
 
 $positionUnitTotal = array_sum(array_column($positionUnitRows, 'nominal'));
@@ -840,111 +837,202 @@ $positionSparepartTotal = 0.0;
 foreach ($positionSparepartRows as $row) {
     $positionSparepartTotal += (float) $row['stok'] * (float) $row['harga_terakhir'];
 }
-$positionRestorasiTotal = 0.0;
-foreach ($positionRestorasiRows as $row) {
-    $positionRestorasiTotal += (float) $row['stok'] * (float) $row['harga_terakhir'];
-}
-$asetTetapRinci = $positionUnitTotal + $positionSparepartTotal + $positionRestorasiTotal;
-$asetTetap = $asetTetapRinci;
-$totalAset = $kasAkhirPeriode + $piutangPenjualan + $asetTetap;
-$totalEkuitas = $totalAset - $totalLiabilitas;
-$modalAwal = $totalEkuitas - $labaRugiKumulatif;
+$persediaanTotal = $positionUnitTotal + $positionSparepartTotal;
 
 $printIncomeTotal = array_sum(array_column($profitIncomeRows, 'nominal'));
 $printCogsTotal = array_sum(array_column($profitCogsRows, 'nominal'));
 $printOperatingTotal = array_sum(array_column($profitOperatingRows, 'nominal'));
 $printInvestmentTotal = array_sum(array_column($investmentRows, 'nominal'));
-$printNetTotal = $printIncomeTotal - $printCogsTotal - $printOperatingTotal - $printInvestmentTotal;
-$printCashEnd = $printNetTotal;
+$printNetTotal = $printIncomeTotal - $printCogsTotal - $printOperatingTotal;
+$printCashEnd = $kasAkhirPeriode;
+$labaRugiPeriode = $printNetTotal;
+$labaRugiKumulatif = $printNetTotal;
+$totalAset = $kasAkhirPeriode + $piutangPenjualan + $persediaanTotal + $asetTetap;
+$totalEkuitas = $totalAset - $totalLiabilitas;
+$modalAwal = $totalEkuitas - $labaRugiKumulatif;
 
+/* ========================================================================
+ * LAPORAN BULANAN: P&L dan CASH FLOW DIPISAH
+ * ======================================================================== */
+$stmt = $pdo->prepare("\n    SELECT periode,\n           SUM(penjualan) AS penjualan,\n           SUM(non_penjualan) AS non_penjualan,\n           SUM(pemasukan_kas) AS pemasukan_kas,\n           SUM(hpp) AS hpp,\n           SUM(belanja_pembelian_kas) AS belanja_pembelian_kas,\n           SUM(modal_aset) AS modal_aset,\n           SUM(beban_operasional) AS beban_operasional,\n           SUM(pengeluaran_lainnya) AS pengeluaran_lainnya,\n           SUM(pengeluaran_kas) AS pengeluaran_kas\n    FROM (\n        SELECT DATE_FORMAT(p.tanggal, '%Y-%m') AS periode,\n               COALESCE(SUM(pd.subtotal), 0) AS penjualan,\n               0 AS non_penjualan,\n               0 AS pemasukan_kas,\n               COALESCE(SUM(pd.hpp), 0) AS hpp,\n               0 AS belanja_pembelian_kas,\n               0 AS modal_aset,\n               0 AS beban_operasional,\n               0 AS pengeluaran_lainnya,\n               0 AS pengeluaran_kas\n        FROM penjualan p\n        INNER JOIN penjualan_detail pd ON pd.penjualan_id = p.id\n        WHERE p.tanggal BETWEEN ? AND ?\n          AND UPPER(COALESCE(p.status, '')) NOT IN ('DRAFT', 'BATAL')\n        GROUP BY p.id, DATE_FORMAT(p.tanggal, '%Y-%m')\n\n        UNION ALL\n\n        SELECT DATE_FORMAT(p.tanggal, '%Y-%m') AS periode,\n               COALESCE(SUM(pd.subtotal), 0) AS penjualan,\n               0 AS non_penjualan,\n               0 AS pemasukan_kas,\n               COALESCE(SUM(pd.hpp), 0) AS hpp,\n               0 AS belanja_pembelian_kas,\n               0 AS modal_aset,\n               0 AS beban_operasional,\n               0 AS pengeluaran_lainnya,\n               0 AS pengeluaran_kas\n        FROM penjualan_sparepart p\n        INNER JOIN penjualan_sparepart_detail pd ON pd.penjualan_id = p.id\n        WHERE p.tanggal BETWEEN ? AND ?\n          AND UPPER(COALESCE(p.status, '')) NOT IN ('DRAFT', 'BATAL')\n        GROUP BY p.id, DATE_FORMAT(p.tanggal, '%Y-%m')\n\n        UNION ALL\n\n        SELECT DATE_FORMAT(pm.tanggal, '%Y-%m'),\n               0,\n               CASE WHEN pm.sumber = 'NON_PENJUALAN' THEN pm.nominal ELSE 0 END,\n               pm.nominal,\n               0,0,0,0,0,0\n        FROM pemasukan pm\n        WHERE pm.tanggal BETWEEN ? AND ?\n\n        UNION ALL\n\n        SELECT DATE_FORMAT(pe.tanggal, '%Y-%m'),\n               0,0,0,0,\n               CASE WHEN pe.sumber = 'PEMBELIAN' THEN pe.nominal ELSE 0 END,\n               CASE WHEN pe.sumber = 'NON_PEMBELIAN' AND COALESCE(k.kelompok_laporan, '') = 'MODAL_ASET' THEN pe.nominal ELSE 0 END,\n               CASE WHEN pe.sumber = 'NON_PEMBELIAN' AND COALESCE(k.kelompok_laporan, '') = 'BEBAN_OPERASIONAL' THEN pe.nominal ELSE 0 END,\n               CASE WHEN pe.sumber = 'NON_PEMBELIAN' AND COALESCE(k.kelompok_laporan, '') NOT IN ('MODAL_ASET', 'BEBAN_OPERASIONAL') THEN pe.nominal ELSE 0 END,\n               pe.nominal\n        FROM pengeluaran pe\n        LEFT JOIN kategori_keuangan k ON k.id = pe.kategori_id\n        WHERE pe.tanggal BETWEEN ? AND ?\n    ) x\n    GROUP BY periode\n    ORDER BY periode ASC\n");
+
+/* Sparepart sale query di atas bisa gagal jika tabel berbeda pada instalasi lama. */
+try {
+    $stmt->execute([
+        $tanggalAwal,
+        $tanggalAkhir,
+        $tanggalAwal,
+        $tanggalAkhir,
+        $tanggalAwal,
+        $tanggalAkhir,
+        $tanggalAwal,
+        $tanggalAkhir
+    ]);
+    $monthlyRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Throwable $e) {
+    $stmt = $pdo->prepare("\n        SELECT periode, SUM(penjualan) penjualan, SUM(non_penjualan) non_penjualan,\n               SUM(pemasukan_kas) pemasukan_kas, SUM(hpp) hpp,\n               SUM(belanja_pembelian_kas) belanja_pembelian_kas, SUM(modal_aset) modal_aset,\n               SUM(beban_operasional) beban_operasional, SUM(pengeluaran_lainnya) pengeluaran_lainnya,\n               SUM(pengeluaran_kas) pengeluaran_kas\n        FROM (\n            SELECT DATE_FORMAT(p.tanggal, '%Y-%m') periode, COALESCE(SUM(pd.subtotal),0) penjualan,\n                   0 non_penjualan, 0 pemasukan_kas, COALESCE(SUM(pd.hpp),0) hpp,\n                   0 belanja_pembelian_kas,0 modal_aset,0 beban_operasional,0 pengeluaran_lainnya,0 pengeluaran_kas\n            FROM penjualan p INNER JOIN penjualan_detail pd ON pd.penjualan_id=p.id\n            WHERE p.tanggal BETWEEN ? AND ? AND UPPER(COALESCE(p.status,'')) NOT IN ('DRAFT','BATAL')\n            GROUP BY p.id, DATE_FORMAT(p.tanggal,'%Y-%m')\n            UNION ALL\n            SELECT DATE_FORMAT(pm.tanggal,'%Y-%m'),0,CASE WHEN pm.sumber='NON_PENJUALAN' THEN pm.nominal ELSE 0 END,pm.nominal,0,0,0,0,0,0\n            FROM pemasukan pm WHERE pm.tanggal BETWEEN ? AND ?\n            UNION ALL\n            SELECT DATE_FORMAT(pe.tanggal,'%Y-%m'),0,0,0,0,\n                   CASE WHEN pe.sumber='PEMBELIAN' THEN pe.nominal ELSE 0 END,\n                   CASE WHEN pe.sumber='NON_PEMBELIAN' AND COALESCE(k.kelompok_laporan,'')='MODAL_ASET' THEN pe.nominal ELSE 0 END,\n                   CASE WHEN pe.sumber='NON_PEMBELIAN' AND COALESCE(k.kelompok_laporan,'')='BEBAN_OPERASIONAL' THEN pe.nominal ELSE 0 END,\n                   CASE WHEN pe.sumber='NON_PEMBELIAN' AND COALESCE(k.kelompok_laporan,'') NOT IN ('MODAL_ASET','BEBAN_OPERASIONAL') THEN pe.nominal ELSE 0 END,pe.nominal\n            FROM pengeluaran pe LEFT JOIN kategori_keuangan k ON k.id=pe.kategori_id\n            WHERE pe.tanggal BETWEEN ? AND ?\n        ) x GROUP BY periode ORDER BY periode ASC\n    ");
+    $stmt->execute([$tanggalAwal, $tanggalAkhir, $tanggalAwal, $tanggalAkhir, $tanggalAwal, $tanggalAkhir]);
+    $monthlyRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+$monthlyMap = [];
+foreach ($monthlyRows as $row) {
+    foreach (['penjualan', 'non_penjualan', 'pemasukan_kas', 'hpp', 'belanja_pembelian_kas', 'modal_aset', 'beban_operasional', 'pengeluaran_lainnya', 'pengeluaran_kas'] as $numericKey) {
+        $row[$numericKey] = (float) ($row[$numericKey] ?? 0);
+    }
+    $monthlyMap[$row['periode']] = $row;
+}
+
+$rangeStart = new DateTimeImmutable(date('Y-m-01', strtotime($tanggalAwal)));
+$rangeEnd = new DateTimeImmutable(date('Y-m-01', strtotime($tanggalAkhir)));
+$monthlyRows = [];
+for ($cursor = $rangeStart; $cursor <= $rangeEnd; $cursor = $cursor->modify('+1 month')) {
+    $periode = $cursor->format('Y-m');
+    $monthlyRows[] = $monthlyMap[$periode] ?? [
+        'periode' => $periode,
+        'penjualan' => 0,
+        'non_penjualan' => 0,
+        'pemasukan_kas' => 0,
+        'hpp' => 0,
+        'belanja_pembelian_kas' => 0,
+        'modal_aset' => 0,
+        'beban_operasional' => 0,
+        'pengeluaran_lainnya' => 0,
+        'pengeluaran_kas' => 0,
+    ];
+}
+
+/* Detail laporan bulanan. */
 $monthlyReportData = [];
 foreach ($monthlyRows as $monthly) {
     $monthlyReportData[$monthly['periode']] = [
-        'periode' => $monthly['periode'],
         'pendapatan_penjualan' => [],
         'pendapatan_non_penjualan' => [],
-        'belanja_pembelian' => [],
+        'hpp' => [],
+        'belanja_pembelian_kas' => [],
         'modal_aset' => [],
         'beban_operasional' => [],
         'pengeluaran_lainnya' => [],
+        'pemasukan_kas' => (float) $monthly['pemasukan_kas'],
+        'pengeluaran_kas' => (float) $monthly['pengeluaran_kas'],
     ];
+}
+
+/* Detail penjualan alat berat + sparepart untuk modal laporan per bulan. */
+$stmt = $pdo->prepare("\n    SELECT p.tanggal, DATE_FORMAT(p.tanggal,'%Y-%m') periode, p.nomor_penjualan nomor,\n           COALESCE(SUM(pd.subtotal),0) nominal\n    FROM penjualan p INNER JOIN penjualan_detail pd ON pd.penjualan_id=p.id\n    WHERE p.tanggal BETWEEN ? AND ? AND UPPER(COALESCE(p.status,'')) NOT IN ('DRAFT','BATAL')\n    GROUP BY p.id,p.tanggal,p.nomor_penjualan ORDER BY p.tanggal,p.id\n");
+$stmt->execute([$tanggalAwal, $tanggalAkhir]);
+foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+    if (isset($monthlyReportData[$row['periode']])) {
+        $monthlyReportData[$row['periode']]['pendapatan_penjualan'][] = [
+            'label' => trim((string) $row['nomor']) !== '' ? 'Penjualan Alat Berat ' . $row['nomor'] : 'Penjualan Alat Berat',
+            'nomor' => $row['nomor'],
+            'tanggal' => $row['tanggal'],
+            'nominal' => (float) $row['nominal']
+        ];
+    }
+}
+
+try {
+    $stmt = $pdo->prepare("
+        SELECT DATE_FORMAT(p.tanggal,'%Y-%m') periode,
+               COALESCE(SUM(pd.subtotal),0) nominal
+        FROM penjualan_sparepart p INNER JOIN penjualan_sparepart_detail pd ON pd.penjualan_id=p.id
+        WHERE p.tanggal BETWEEN ? AND ? AND UPPER(COALESCE(p.status,'')) NOT IN ('DRAFT','BATAL')
+        GROUP BY DATE_FORMAT(p.tanggal,'%Y-%m')
+    ");
+    $stmt->execute([$tanggalAwal, $tanggalAkhir]);
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        if (isset($monthlyReportData[$row['periode']])) {
+            $monthlyReportData[$row['periode']]['pendapatan_penjualan'][] = [
+                'label' => 'Penjualan Sparepart',
+                'nomor' => '',
+                'tanggal' => '',
+                'nominal' => (float) $row['nominal']
+            ];
+        }
+    }
+} catch (Throwable $e) {
 }
 
 foreach ($incomeDetailRows as $row) {
     $periode = (string) $row['periode'];
-    if (!isset($monthlyReportData[$periode]))
+    if ($row['sumber'] === 'PENJUALAN' || !isset($monthlyReportData[$periode]))
         continue;
-
-    if ($row['sumber'] === 'PENJUALAN') {
-        $detail = trim((string) $row['detail_penjualan']);
-        $nomorPenjualan = trim((string) $row['nomor_penjualan']);
-        $label = $detail !== ''
-            ? $detail
-            : ($nomorPenjualan !== '' ? 'Penjualan ' . $nomorPenjualan : 'Pendapatan Penjualan');
-
-        if (!empty($row['termin_ke'])) {
-            $label .= ' Termin ' . (int) $row['termin_ke'];
-        }
-
-        $monthlyReportData[$periode]['pendapatan_penjualan'][] = [
-            'label' => $label,
-            'nomor' => $nomorPenjualan,
-            'tanggal' => $row['tanggal'],
-            'nominal' => (float) $row['nominal'],
-            'metode' => $row['metode_pembayaran'],
-            'referensi' => $row['referensi'],
-        ];
-    } else {
-        $monthlyReportData[$periode]['pendapatan_non_penjualan'][] = [
-            'label' => $row['kategori_nama'] ?: ($row['jenis_pembayaran'] ?: 'Pendapatan Non Penjualan'),
-            'nomor' => $row['nomor'],
-            'tanggal' => $row['tanggal'],
-            'nominal' => (float) $row['nominal'],
-            'metode' => $row['metode_pembayaran'],
-            'referensi' => $row['referensi'],
-        ];
-    }
+    $monthlyReportData[$periode]['pendapatan_non_penjualan'][] = [
+        'label' => $row['kategori_nama'] ?: ($row['jenis_pembayaran'] ?: 'Pendapatan Non Penjualan'),
+        'nomor' => $row['nomor'],
+        'tanggal' => $row['tanggal'],
+        'nominal' => (float) $row['nominal'],
+        'metode' => $row['metode_pembayaran'],
+        'referensi' => $row['referensi']
+    ];
 }
 
+/* HPP bulanan dari detail penjualan. */
+$stmt = $pdo->prepare("\n    SELECT p.tanggal, DATE_FORMAT(p.tanggal,'%Y-%m') periode, ab.kode, pd.hpp nominal\n    FROM penjualan p INNER JOIN penjualan_detail pd ON pd.penjualan_id=p.id\n    LEFT JOIN alat_berat ab ON ab.id=pd.alat_berat_id\n    WHERE p.tanggal BETWEEN ? AND ? AND UPPER(COALESCE(p.status,'')) NOT IN ('DRAFT','BATAL') AND COALESCE(pd.hpp,0)>0\n    ORDER BY p.tanggal,p.id,pd.id\n");
+$stmt->execute([$tanggalAwal, $tanggalAkhir]);
+foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+    if (!isset($monthlyReportData[$row['periode']]))
+        continue;
+    $monthlyReportData[$row['periode']]['hpp'][] = [
+        'label' => 'HPP Alat Berat' . (trim((string) $row['kode']) !== '' ? ' ' . $row['kode'] : ''),
+        'tanggal' => $row['tanggal'],
+        'nominal' => (float) $row['nominal']
+    ];
+}
+try {
+    $stmt = $pdo->prepare("
+        SELECT DATE_FORMAT(p.tanggal,'%Y-%m') periode, SUM(pd.hpp) nominal
+        FROM penjualan_sparepart p INNER JOIN penjualan_sparepart_detail pd ON pd.penjualan_id=p.id
+        WHERE p.tanggal BETWEEN ? AND ? AND UPPER(COALESCE(p.status,'')) NOT IN ('DRAFT','BATAL') AND COALESCE(pd.hpp,0)>0
+        GROUP BY DATE_FORMAT(p.tanggal,'%Y-%m')
+    ");
+    $stmt->execute([$tanggalAwal, $tanggalAkhir]);
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        if (!isset($monthlyReportData[$row['periode']]))
+            continue;
+        $monthlyReportData[$row['periode']]['hpp'][] = [
+            'label' => 'HPP Sparepart',
+            'tanggal' => '',
+            'nominal' => (float) $row['nominal']
+        ];
+    }
+} catch (Throwable $e) {
+}
+
+/* Pengeluaran kas bulanan tetap menunjukkan pembelian sebagai CASH FLOW, bukan HPP. */
 foreach ($expenseDetailRows as $row) {
     $periode = (string) $row['periode'];
     if (!isset($monthlyReportData[$periode]))
         continue;
-
     if ($row['sumber'] === 'PEMBELIAN') {
         if (!empty($row['pembelian_pembayaran_id'])) {
             $purchaseNo = trim((string) $row['nomor_pembelian_alat_berat']);
-            $label = 'Pembelian Alat Berat' . ($purchaseNo !== '' ? ' ' . $purchaseNo : '');
-            $detail = $row['termin_ke'] ? 'Termin ' . $row['termin_ke'] : 'Pembayaran';
+            $label = 'Pembayaran Pembelian Alat Berat' . ($purchaseNo !== '' ? ' ' . $purchaseNo : '');
+        } elseif (!empty($row['pembelian_sparepart_id'])) {
+            if (!isset($monthlyReportData[$periode]['temp_sparepart_purchase'])) {
+                $monthlyReportData[$periode]['temp_sparepart_purchase'] = 0.0;
+            }
+            $monthlyReportData[$periode]['temp_sparepart_purchase'] += (float) $row['nominal'];
+            continue;
+        } elseif (!empty($row['pembelian_restorasi_id'])) {
+            $label = 'Pembayaran Pembelian Restorasi';
         } else {
-            $purchaseNo = trim((string) $row['nomor_pembelian_sparepart']);
-            $label = 'Pembelian Sparepart' . ($purchaseNo !== '' ? ' ' . $purchaseNo : '');
-            $detail = 'Pembelian Sparepart';
+            $label = 'Pembayaran Pembelian';
         }
-
-        $monthlyReportData[$periode]['belanja_pembelian'][] = [
+        $monthlyReportData[$periode]['belanja_pembelian_kas'][] = [
             'label' => $label,
-            'detail' => $detail,
+            'detail' => !empty($row['termin_ke']) ? 'Termin ' . $row['termin_ke'] : 'Pembayaran',
             'nomor' => $row['nomor'],
             'tanggal' => $row['tanggal'],
             'nominal' => (float) $row['nominal'],
             'metode' => $row['metode_pembayaran'],
-            'referensi' => $row['referensi'],
+            'referensi' => $row['referensi']
         ];
         continue;
     }
-
     $group = (string) ($row['kelompok_laporan'] ?? 'LAINNYA');
-
-    // Gunakan if/elseif agar kompatibel dengan PHP 7.x.
-    if ($group === 'MODAL_ASET') {
-        $target = 'modal_aset';
-    } elseif ($group === 'BEBAN_OPERASIONAL') {
-        $target = 'beban_operasional';
-    } else {
-        $target = 'pengeluaran_lainnya';
-    }
-
+    $target = $group === 'MODAL_ASET' ? 'modal_aset' : ($group === 'BEBAN_OPERASIONAL' ? 'beban_operasional' : 'pengeluaran_lainnya');
     $monthlyReportData[$periode][$target][] = [
         'label' => $row['kategori_nama'] ?: ($row['jenis_pengeluaran'] ?: 'Tanpa Kategori'),
         'nomor' => $row['nomor'],
@@ -952,23 +1040,43 @@ foreach ($expenseDetailRows as $row) {
         'nominal' => (float) $row['nominal'],
         'metode' => $row['metode_pembayaran'],
         'referensi' => $row['referensi'],
-        'keterangan' => $row['keterangan'],
+        'keterangan' => $row['keterangan']
     ];
 }
+
+// Gabungkan akumulasi pembelian sparepart
+foreach ($monthlyReportData as $periode => &$mData) {
+    if (!empty($mData['temp_sparepart_purchase'])) {
+        $mData['belanja_pembelian_kas'][] = [
+            'label' => 'Pembayaran Pembelian Sparepart',
+            'detail' => '',
+            'nomor' => '',
+            'tanggal' => '',
+            'nominal' => $mData['temp_sparepart_purchase'],
+            'metode' => '',
+            'referensi' => ''
+        ];
+        unset($mData['temp_sparepart_purchase']);
+    }
+}
+unset($mData);
+
+// Opsi bulan laporan selalu mengikuti rentang tanggal yang dipilih.
+// Bulan tanpa transaksi tetap ditampilkan agar filter tidak hilang saat periode diperlebar.
+$reportMonthOptions = [];
+$monthCursor = new DateTimeImmutable(date('Y-m-01', strtotime($tanggalAwal)));
+$monthEnd = new DateTimeImmutable(date('Y-m-01', strtotime($tanggalAkhir)));
+while ($monthCursor <= $monthEnd) {
+    $reportMonthOptions[] = $monthCursor->format('Y-m');
+    $monthCursor = $monthCursor->modify('+1 month');
+}
+$selectedReportMonth = $reportMonthOptions[0] ?? date('Y-m');
 
 $monthlyReportDataJson = json_encode(
     $monthlyReportData,
     JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES |
     JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
 );
-
-$reportMonthOptions = array_map(
-    static function (array $row): string {
-        return $row['periode'];
-    },
-    $monthlyRows
-);
-$selectedReportMonth = $reportMonthOptions[count($reportMonthOptions) - 1] ?? date('Y-m');
 
 /*
 |--------------------------------------------------------------------------
@@ -1535,13 +1643,30 @@ require_once __DIR__ . '/../includes/header.php';
         margin-bottom: 5px
     }
 
+    .month-selector-field {
+        min-width: 190px;
+    }
+
     .month-selector-form select {
-        min-width: 170px;
-        border: 1px solid #b9c7d8;
+        display: block;
+        width: 190px;
+        min-height: 38px;
+        box-sizing: border-box;
+        border: 1px solid #8fa4bd;
         border-radius: 5px;
-        padding: 8px 9px;
+        padding: 8px 32px 8px 10px;
         font-size: 12px;
-        background: #fff
+        line-height: 1.4;
+        color: #172b4d;
+        background-color: #fff;
+        appearance: auto;
+        -webkit-appearance: menulist;
+        cursor: pointer;
+    }
+
+    .month-selector-form select:focus {
+        outline: 2px solid rgba(13, 110, 253, .18);
+        border-color: #0d6efd;
     }
 
     .btn-month-detail,
@@ -1848,15 +1973,6 @@ require_once __DIR__ . '/../includes/header.php';
         text-align: left !important
     }
 
-    .statement-table .subsection td {
-        padding-top: 6px;
-        padding-bottom: 3px;
-        font-weight: 700;
-        color: #526b8d;
-        text-align: left !important;
-        border-bottom: 0
-    }
-
     .statement-print {
         display: none
     }
@@ -2077,10 +2193,10 @@ require_once __DIR__ . '/../includes/header.php';
                             <td colspan="2">PENDAPATAN</td>
                         </tr>
                         <?php foreach ($profitIncomeRows as $row): ?>
-                            <tr class="indent">
-                                <td><?php echo h($row['label']); ?></td>
-                                <td><?php echo rupiah($row['nominal']); ?></td>
-                            </tr>
+                                <tr class="indent">
+                                    <td><?php echo h($row['label']); ?></td>
+                                    <td><?php echo rupiah($row['nominal']); ?></td>
+                                </tr>
                         <?php endforeach; ?>
                         <tr class="total">
                             <td>TOTAL PENDAPATAN</td>
@@ -2090,10 +2206,10 @@ require_once __DIR__ . '/../includes/header.php';
                             <td colspan="2">BEBAN POKOK PENDAPATAN</td>
                         </tr>
                         <?php foreach ($profitCogsRows as $row): ?>
-                            <tr class="indent">
-                                <td><?php echo h($row['label']); ?></td>
-                                <td><?php echo rupiah($row['nominal']); ?></td>
-                            </tr>
+                                <tr class="indent">
+                                    <td><?php echo h($row['label']); ?></td>
+                                    <td><?php echo rupiah($row['nominal']); ?></td>
+                                </tr>
                         <?php endforeach; ?>
                         <tr class="total">
                             <td>TOTAL BEBAN POKOK PENDAPATAN</td>
@@ -2103,10 +2219,10 @@ require_once __DIR__ . '/../includes/header.php';
                             <td colspan="2">BEBAN OPERASIONAL</td>
                         </tr>
                         <?php foreach ($profitOperatingRows as $row): ?>
-                            <tr class="indent">
-                                <td><?php echo h($row['label']); ?></td>
-                                <td><?php echo rupiah($row['nominal']); ?></td>
-                            </tr>
+                                <tr class="indent">
+                                    <td><?php echo h($row['label']); ?></td>
+                                    <td><?php echo rupiah($row['nominal']); ?></td>
+                                </tr>
                         <?php endforeach; ?>
                         <tr class="total">
                             <td>TOTAL BEBAN OPERASIONAL</td>
@@ -2153,47 +2269,55 @@ require_once __DIR__ . '/../includes/header.php';
                 <table class="statement-table">
                     <tbody>
                         <tr class="section">
-                            <td colspan="2">ARUS KAS DARI AKTIVITAS OPERASIONAL</td>
+                            <td colspan="2">ARUS KAS AKTIVITAS OPERASIONAL</td>
                         </tr>
-                        <?php foreach ($profitIncomeRows as $row): ?>
-                            <tr class="indent">
-                                <td><?php echo h('Penerimaan ' . $row['label']); ?></td>
-                                <td><?php echo rupiah($row['nominal']); ?></td>
-                            </tr>
-                        <?php endforeach; ?>
-                        <?php foreach (array_merge($profitCogsRows, $profitOperatingRows) as $row): ?>
-                            <tr class="indent">
-                                <td><?php echo h('Pembayaran ' . $row['label']); ?></td>
-                                <td><?php echo rupiah(-$row['nominal']); ?></td>
-                            </tr>
-                        <?php endforeach; ?>
+                        <tr class="indent">
+                            <td>Penerimaan Kas</td>
+                            <td><?php echo rupiah($totalPemasukan); ?></td>
+                        </tr>
+                        <tr class="indent">
+                            <td>Pembayaran Pembelian Alat Berat & Sparepart</td>
+                            <td><?php echo rupiah(-$belanjaPembelian); ?></td>
+                        </tr>
+                        <tr class="indent">
+                            <td>Beban Operasional & Pengeluaran Lainnya</td>
+                            <td><?php echo rupiah(-$printOperatingTotal - $pengeluaranLainnya); ?></td>
+                        </tr>
                         <tr class="total">
-                            <td>Kas Bersih Operasional</td>
-                            <td><?php echo rupiah($printIncomeTotal - $printCogsTotal - $printOperatingTotal); ?></td>
+                            <td>Kas Bersih Aktivitas Operasional</td>
+                            <td><?php echo rupiah($totalPemasukan - $belanjaPembelian - $printOperatingTotal - $pengeluaranLainnya); ?></td>
                         </tr>
                         <tr class="section">
-                            <td colspan="2">ARUS KAS DARI AKTIVITAS INVESTASI</td>
+                            <td colspan="2">ARUS KAS AKTIVITAS INVESTASI</td>
                         </tr>
                         <?php foreach ($investmentRows as $row): ?>
-                            <tr class="indent">
-                                <td><?php echo h($row['label']); ?></td>
-                                <td><?php echo rupiah(-$row['nominal']); ?></td>
-                            </tr>
+                                <tr class="indent">
+                                    <td><?php echo h($row['label']); ?></td>
+                                    <td><?php echo rupiah(-$row['nominal']); ?></td>
+                                </tr>
                         <?php endforeach; ?>
                         <tr class="total">
                             <td>Kas Bersih Aktivitas Investasi</td>
                             <td><?php echo rupiah(-$printInvestmentTotal); ?></td>
                         </tr>
                         <tr class="section">
-                            <td colspan="2">ARUS KAS DARI AKTIVITAS PENDANAAN</td>
+                            <td colspan="2">ARUS KAS AKTIVITAS PENDANAAN</td>
                         </tr>
                         <tr class="indent">
                             <td>Penerimaan / Pembayaran Modal</td>
                             <td><?php echo rupiah(0); ?></td>
                         </tr>
+                        <tr class="total">
+                            <td>Perubahan Kas Periode</td>
+                            <td><?php echo rupiah($arusKasPeriode); ?></td>
+                        </tr>
+                        <tr class="indent">
+                            <td>Kas Awal Periode</td>
+                            <td><?php echo rupiah($kasAwalPeriode); ?></td>
+                        </tr>
                         <tr class="grand-total">
                             <td>KAS AKHIR PERIODE</td>
-                            <td><?php echo rupiah($printCashEnd); ?></td>
+                            <td><?php echo rupiah($kasAkhirPeriode); ?></td>
                         </tr>
                     </tbody>
                 </table>
@@ -2216,45 +2340,28 @@ require_once __DIR__ . '/../includes/header.php';
                             <td>Piutang Penjualan</td>
                             <td><?php echo rupiah($piutangPenjualan); ?></td>
                         </tr>
-                        <tr class="subsection">
-                            <td colspan="2">UNIT ALAT BERAT</td>
-                        </tr>
                         <?php foreach ($positionUnitRows as $row): ?>
-                            <tr class="indent">
-                                <td><?php echo h($row['label']); ?></td>
-                                <td><?php echo rupiah($row['nominal']); ?></td>
-                            </tr>
+                                <tr class="indent">
+                                    <td><?php echo h($row['label']); ?></td>
+                                    <td><?php echo rupiah($row['nominal']); ?></td>
+                                </tr>
                         <?php endforeach; ?>
-                        <tr class="subsection">
-                            <td colspan="2">SPAREPART</td>
-                        </tr>
-                        <?php foreach ($positionSparepartRows as $row): ?>
-                            <?php $stockValue = (float) $row['stok'] * (float) $row['harga_terakhir']; ?>
-                            <tr class="indent">
-                                <td><?php echo h($row['kode']); ?></td>
-                                <td><?php echo rupiah($stockValue); ?></td>
-                            </tr>
-                        <?php endforeach; ?>
-                        <tr class="subsection">
-                            <td colspan="2">BAHAN RESTORASI</td>
-                        </tr>
-                        <?php foreach ($positionRestorasiRows as $row): ?>
-                            <?php $restorationValue = (float) $row['stok'] * (float) $row['harga_terakhir']; ?>
-                            <tr class="indent">
-                                <td><?php echo h($row['kode']); ?></td>
-                                <td><?php echo rupiah($restorationValue); ?></td>
-                            </tr>
-                        <?php endforeach; ?>
+                        <?php if ($positionSparepartTotal > 0): ?>
+                                <tr class="indent">
+                                    <td>Sparepart</td>
+                                    <td><?php echo rupiah($positionSparepartTotal); ?></td>
+                                </tr>
+                        <?php endif; ?>
                         <tr class="total">
                             <td>Total Aset Lancar</td>
-                            <td><?php echo rupiah($printCashEnd + $piutangPenjualan + $asetTetap); ?></td>
+                            <td><?php echo rupiah($printCashEnd + $piutangPenjualan + $persediaanTotal); ?></td>
                         </tr>
                         <tr class="section">
                             <td colspan="2">ASET TETAP</td>
                         </tr>
                         <tr class="indent">
                             <td>Aset Tetap</td>
-                            <td><?php echo rupiah(0); ?></td>
+                            <td><?php echo rupiah($asetTetap); ?></td>
                         </tr>
                         <tr class="grand-total">
                             <td>TOTAL ASET</td>
@@ -2302,14 +2409,18 @@ require_once __DIR__ . '/../includes/header.php';
             <span>Pilih bulan untuk melihat laporan pendapatan, pembelian, modal aset, dan beban operasional.</span>
         </div>
         <div class="month-selector-form">
-            <div>
+            <div class="month-selector-field">
                 <label for="reportMonth">Pilih Bulan</label>
-                <select id="reportMonth">
-                    <?php foreach ($reportMonthOptions as $monthOption): ?>
-                        <option value="<?php echo h($monthOption); ?>" <?php echo $monthOption === $selectedReportMonth ? 'selected' : ''; ?>>
-                            <?php echo h(date('F Y', strtotime($monthOption . '-01'))); ?>
-                        </option>
-                    <?php endforeach; ?>
+                <select id="reportMonth" name="report_month" aria-label="Pilih bulan laporan">
+                    <?php if (empty($reportMonthOptions)): ?>
+                            <option value="" selected>Tidak ada bulan</option>
+                    <?php else: ?>
+                            <?php foreach ($reportMonthOptions as $monthOption): ?>
+                                    <option value="<?php echo h($monthOption); ?>" <?php echo $monthOption === $selectedReportMonth ? 'selected' : ''; ?>>
+                                        <?php echo h($bulanIndonesia[(int) date('n', strtotime($monthOption . '-01'))] . ' ' . date('Y', strtotime($monthOption . '-01'))); ?>
+                                    </option>
+                            <?php endforeach; ?>
+                    <?php endif; ?>
                 </select>
             </div>
             <button type="button" class="btn-month-detail" onclick="showMonthlyReport()">Tampilkan Laporan</button>
@@ -2438,7 +2549,7 @@ require_once __DIR__ . '/../includes/header.php';
                 <div class="mini-grid">
 
                     <div class="mini-box">
-                        <div class="label">Belanja Pembelian</div>
+                        <div class="label">Belanja Pembelian Alat Berat & Sparepart</div>
                         <div class="value">
                             <?php echo rupiah($belanjaPembelian); ?>
                         </div>
@@ -2661,76 +2772,76 @@ require_once __DIR__ . '/../includes/header.php';
 
             <?php if (!$monthlyRows): ?>
 
-                <div class="empty-report">
-                    Belum ada transaksi keuangan pada periode tersebut.
-                </div>
+                    <div class="empty-report">
+                        Belum ada transaksi keuangan pada periode tersebut.
+                    </div>
 
             <?php else: ?>
 
-                <?php
-                $maxMonthly = 0.0;
+                    <?php
+                    $maxMonthly = 0.0;
 
-                foreach ($monthlyRows as $monthly) {
-                    $maxMonthly = max(
-                        $maxMonthly,
-                        (float) $monthly['pemasukan'],
-                        (float) $monthly['pengeluaran']
-                    );
-                }
-                ?>
+                    foreach ($monthlyRows as $monthly) {
+                        $maxMonthly = max(
+                            $maxMonthly,
+                            (float) $monthly['pemasukan_kas'],
+                            (float) $monthly['pengeluaran_kas']
+                        );
+                    }
+                    ?>
 
-                <div class="chart-wrap">
+                    <div class="chart-wrap">
 
-                    <?php foreach ($monthlyRows as $monthly): ?>
+                        <?php foreach ($monthlyRows as $monthly): ?>
 
-                        <?php
-                        $inValue = (float) $monthly['pemasukan'];
-                        $outValue = (float) $monthly['pengeluaran'];
+                                <?php
+                                $inValue = (float) $monthly['pemasukan_kas'];
+                                $outValue = (float) $monthly['pengeluaran_kas'];
 
-                        $inHeight = $maxMonthly > 0
-                            ? ($inValue / $maxMonthly) * 165
-                            : 2;
+                                $inHeight = $maxMonthly > 0
+                                    ? ($inValue / $maxMonthly) * 165
+                                    : 2;
 
-                        $outHeight = $maxMonthly > 0
-                            ? ($outValue / $maxMonthly) * 165
-                            : 2;
-                        ?>
+                                $outHeight = $maxMonthly > 0
+                                    ? ($outValue / $maxMonthly) * 165
+                                    : 2;
+                                ?>
 
-                        <div class="chart-column">
+                                <div class="chart-column">
 
-                            <div class="chart-bars" title="<?php
-                            echo h(
-                                $monthly['periode'] .
-                                ' | Masuk: ' . rupiah($inValue) .
-                                ' | Keluar: ' . rupiah($outValue)
-                            );
-                            ?>">
-                                <div class="chart-bar in" style="height:<?php echo max(2, $inHeight); ?>px"></div>
+                                    <div class="chart-bars" title="<?php
+                                    echo h(
+                                        $monthly['periode'] .
+                                        ' | Masuk: ' . rupiah($inValue) .
+                                        ' | Keluar: ' . rupiah($outValue)
+                                    );
+                                    ?>">
+                                        <div class="chart-bar in" style="height:<?php echo max(2, $inHeight); ?>px"></div>
 
-                                <div class="chart-bar out" style="height:<?php echo max(2, $outHeight); ?>px"></div>
-                            </div>
+                                        <div class="chart-bar out" style="height:<?php echo max(2, $outHeight); ?>px"></div>
+                                    </div>
 
-                            <div class="chart-month">
-                                <?php echo h($monthly['periode']); ?>
-                            </div>
+                                    <div class="chart-month">
+                                        <?php echo h($monthly['periode']); ?>
+                                    </div>
 
+                                </div>
+
+                        <?php endforeach; ?>
+
+                    </div>
+
+                    <div class="chart-legend">
+                        <div class="legend-item">
+                            <span class="legend-dot legend-in"></span>
+                            Pemasukan
                         </div>
 
-                    <?php endforeach; ?>
-
-                </div>
-
-                <div class="chart-legend">
-                    <div class="legend-item">
-                        <span class="legend-dot legend-in"></span>
-                        Pemasukan
+                        <div class="legend-item">
+                            <span class="legend-dot legend-out"></span>
+                            Pengeluaran
+                        </div>
                     </div>
-
-                    <div class="legend-item">
-                        <span class="legend-dot legend-out"></span>
-                        Pengeluaran
-                    </div>
-                </div>
 
             <?php endif; ?>
 
@@ -2748,49 +2859,58 @@ require_once __DIR__ . '/../includes/header.php';
                 client.</small>
         </div>
         <?php if (!$monthlyRows): ?>
-            <div class="empty-report">Belum ada bulan pada periode tersebut.</div>
+                <div class="empty-report">Belum ada bulan pada periode tersebut.</div>
         <?php else: ?>
-            <div class="monthly-table-wrap">
-                <table class="report-table month-summary-table">
-                    <thead>
-                        <tr>
-                            <th>Bulan</th>
-                            <th class="right">Pendapatan Penjualan</th>
-                            <th class="right">Pendapatan Non Penjualan</th>
-                            <th class="right">Total Pendapatan</th>
-                            <th class="right">Belanja Pembelian</th>
-                            <th class="right">Modal Aset</th>
-                            <th class="right">Beban Operasional</th>
-                            <th class="right">Total Pengeluaran</th>
-                            <th class="right">Arus Kas Bersih</th>
-                            <th>Detail</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($monthlyRows as $monthly): ?>
-                            <?php $monthNet = (float) $monthly['pemasukan'] - (float) $monthly['pengeluaran']; ?>
+                <div class="monthly-table-wrap">
+                    <table class="report-table month-summary-table">
+                        <thead>
                             <tr>
-                                <td><strong><?php echo h(date('F Y', strtotime($monthly['periode'] . '-01'))); ?></strong>
-                                    <div class="report-note" style="margin-top:2px"><?php echo h($monthly['periode']); ?></div>
-                                </td>
-                                <td class="money"><?php echo rupiah($monthly['penjualan']); ?></td>
-                                <td class="money"><?php echo rupiah($monthly['non_penjualan']); ?></td>
-                                <td class="money"><strong><?php echo rupiah($monthly['pemasukan']); ?></strong></td>
-                                <td class="money"><?php echo rupiah($monthly['belanja_pembelian']); ?></td>
-                                <td class="money"><?php echo rupiah($monthly['modal_aset']); ?></td>
-                                <td class="money"><?php echo rupiah($monthly['beban_operasional']); ?></td>
-                                <td class="money"><strong><?php echo rupiah($monthly['pengeluaran']); ?></strong></td>
-                                <td
-                                    class="money <?php echo $monthNet >= 0 ? 'month-value-positive' : 'month-value-negative'; ?>">
-                                    <?php echo rupiah($monthNet); ?></td>
-                                <td><button type="button" class="btn-detail-month"
-                                        onclick="showMonthlyReport('<?php echo h($monthly['periode']); ?>')">Detail</button>
-                                </td>
+                                <th>Bulan</th>
+                                <th class="right">Pendapatan Penjualan</th>
+                                <th class="right">Pendapatan Non Penjualan</th>
+                                <th class="right">Total Pendapatan</th>
+                                <th class="right">HPP</th>
+                                <th class="right">Laba Kotor</th>
+                                <th class="right">Pembayaran Pembelian</th>
+                                <th class="right">Modal Aset</th>
+                                <th class="right">Beban Operasional</th>
+                                <th class="right">Total Pengeluaran</th>
+                                <th class="right">Arus Kas Bersih</th>
+                                <th>Detail</th>
                             </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($monthlyRows as $monthly): ?>
+                                    <?php
+                                    $monthIncome = (float) $monthly['penjualan'] + (float) $monthly['non_penjualan'];
+                                    $monthGrossProfit = $monthIncome - (float) $monthly['hpp'];
+                                    $monthCashOut = (float) $monthly['pengeluaran_kas'];
+                                    $monthCashNet = (float) $monthly['pemasukan_kas'] - $monthCashOut;
+                                    ?>
+                                    <tr>
+                                        <td><strong><?php echo h(date('F Y', strtotime($monthly['periode'] . '-01'))); ?></strong>
+                                            <div class="report-note" style="margin-top:2px"><?php echo h($monthly['periode']); ?></div>
+                                        </td>
+                                        <td class="money"><?php echo rupiah($monthly['penjualan']); ?></td>
+                                        <td class="money"><?php echo rupiah($monthly['non_penjualan']); ?></td>
+                                        <td class="money"><strong><?php echo rupiah($monthIncome); ?></strong></td>
+                                        <td class="money"><?php echo rupiah($monthly['hpp']); ?></td>
+                                        <td class="money"><strong><?php echo rupiah($monthGrossProfit); ?></strong></td>
+                                        <td class="money"><?php echo rupiah($monthly['belanja_pembelian_kas']); ?></td>
+                                        <td class="money"><?php echo rupiah($monthly['modal_aset']); ?></td>
+                                        <td class="money"><?php echo rupiah($monthly['beban_operasional']); ?></td>
+                                        <td class="money"><strong><?php echo rupiah($monthCashOut); ?></strong></td>
+                                        <td
+                                            class="money <?php echo $monthCashNet >= 0 ? 'month-value-positive' : 'month-value-negative'; ?>">
+                                            <?php echo rupiah($monthCashNet); ?></td>
+                                        <td><button type="button" class="btn-detail-month"
+                                                onclick="showMonthlyReport('<?php echo h($monthly['periode']); ?>')">Detail</button>
+                                        </td>
+                                    </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
         <?php endif; ?>
     </div>
 
@@ -2814,112 +2934,112 @@ require_once __DIR__ . '/../includes/header.php';
 
     <div class="report-card">
 
-        <?php if (!$expenseCategories): ?>
+        <?php if (empty($expenseCategories)): ?>
 
-            <div class="empty-report">
-                Belum ada data pengeluaran pada periode tersebut.
-            </div>
+                <div class="empty-report">
+                    Belum ada data pengeluaran pada periode tersebut.
+                </div>
 
         <?php else: ?>
 
-            <table class="report-table">
+                <table class="report-table">
 
-                <thead>
-                    <tr>
-                        <th>Kategori</th>
-                        <th>Kelompok</th>
-                        <th>Transaksi</th>
-                        <th class="right">Total</th>
-                        <th style="width:35%">Proporsi</th>
-                    </tr>
-                </thead>
-
-                <tbody>
-
-                    <?php foreach ($expenseCategories as $category): ?>
-
-                        <?php
-                        $categoryTotal = (float) $category['total'];
-
-                        $percentage = $totalPengeluaran > 0
-                            ? ($categoryTotal / $totalPengeluaran) * 100
-                            : 0;
-                        ?>
-
+                    <thead>
                         <tr>
+                            <th>Kategori</th>
+                            <th>Kelompok</th>
+                            <th>Transaksi</th>
+                            <th class="right">Total</th>
+                            <th style="width:35%">Proporsi</th>
+                        </tr>
+                    </thead>
 
-                            <td>
-                                <strong>
-                                    <?php echo h($category['kategori']); ?>
-                                </strong>
-                            </td>
+                    <tbody>
 
-                            <td>
-                                <span class="badge badge-group">
-                                    <?php
-                                    echo h(
-                                        str_replace(
-                                            '_',
-                                            ' ',
-                                            $category['kelompok']
-                                        )
-                                    );
-                                    ?>
-                                </span>
-                            </td>
+                        <?php foreach ($expenseCategories as $category): ?>
 
-                            <td>
-                                <?php echo number_format(
-                                    (int) $category['jumlah'],
-                                    0,
-                                    ',',
-                                    '.'
-                                ); ?>
-                            </td>
+                                <?php
+                                $categoryTotal = (float) $category['total'];
 
-                            <td class="money">
-                                <?php echo rupiah($categoryTotal); ?>
-                            </td>
+                                $percentage = $totalPengeluaran > 0
+                                    ? ($categoryTotal / $totalPengeluaran) * 100
+                                    : 0;
+                                ?>
 
-                            <td>
+                                <tr>
 
-                                <div class="progress-row">
+                                    <td>
+                                        <strong>
+                                            <?php echo h($category['kategori']); ?>
+                                        </strong>
+                                    </td>
 
-                                    <div class="progress-label">
-
-                                        <span>
-                                            <?php echo number_format(
-                                                $percentage,
-                                                1,
-                                                ',',
-                                                '.'
-                                            ); ?>%
+                                    <td>
+                                        <span class="badge badge-group">
+                                            <?php
+                                            echo h(
+                                                str_replace(
+                                                    '_',
+                                                    ' ',
+                                                    $category['kelompok']
+                                                )
+                                            );
+                                            ?>
                                         </span>
+                                    </td>
 
-                                        <span>
-                                            <?php echo rupiah($categoryTotal); ?>
-                                        </span>
+                                    <td>
+                                        <?php echo number_format(
+                                            (int) $category['jumlah'],
+                                            0,
+                                            ',',
+                                            '.'
+                                        ); ?>
+                                    </td>
 
-                                    </div>
+                                    <td class="money">
+                                        <?php echo rupiah($categoryTotal); ?>
+                                    </td>
 
-                                    <div class="progress-track">
+                                    <td>
 
-                                        <div class="progress-fill" style="width:<?php echo min(100, max(0, $percentage)); ?>%">
+                                        <div class="progress-row">
+
+                                            <div class="progress-label">
+
+                                                <span>
+                                                    <?php echo number_format(
+                                                        $percentage,
+                                                        1,
+                                                        ',',
+                                                        '.'
+                                                    ); ?>%
+                                                </span>
+
+                                                <span>
+                                                    <?php echo rupiah($categoryTotal); ?>
+                                                </span>
+
+                                            </div>
+
+                                            <div class="progress-track">
+
+                                                <div class="progress-fill" style="width:<?php echo min(100, max(0, $percentage)); ?>%">
+                                                </div>
+
+                                            </div>
+
                                         </div>
 
-                                    </div>
+                                    </td>
 
-                                </div>
+                                </tr>
 
-                            </td>
+                        <?php endforeach; ?>
 
-                        </tr>
+                    </tbody>
 
-                    <?php endforeach; ?>
-
-                </tbody>
-
-            </table>
+                </table>
 
         <?php endif; ?>
 
@@ -2941,121 +3061,121 @@ require_once __DIR__ . '/../includes/header.php';
             </small>
         </div>
 
-        <?php if (!$cashRows): ?>
+        <?php if (empty($cashRows)): ?>
 
-            <div class="empty-report">
-                Belum ada transaksi kas pada periode tersebut.
-            </div>
+                <div class="empty-report">
+                    Belum ada transaksi kas pada periode tersebut.
+                </div>
 
         <?php else: ?>
 
-            <div class="cash-table-wrap">
+                <div class="cash-table-wrap">
 
-                <table class="report-table cash-table">
+                    <table class="report-table cash-table">
 
-                    <thead>
-                        <tr>
-                            <th>Tanggal</th>
-                            <th>Nomor</th>
-                            <th>Tipe</th>
-                            <th>Sumber</th>
-                            <th>Kategori</th>
-                            <th>Jenis</th>
-                            <th class="right">Pemasukan</th>
-                            <th class="right">Pengeluaran</th>
-                            <th>Metode</th>
-                            <th>Referensi</th>
-                            <th>Keterangan</th>
-                        </tr>
-                    </thead>
-
-                    <tbody>
-
-                        <?php foreach ($cashRows as $row): ?>
-
+                        <thead>
                             <tr>
-
-                                <td>
-                                    <?php echo h($row['tanggal']); ?>
-                                </td>
-
-                                <td>
-                                    <strong>
-                                        <?php echo h($row['nomor']); ?>
-                                    </strong>
-                                </td>
-
-                                <td>
-                                    <?php if ($row['tipe'] === 'PEMASUKAN'): ?>
-
-                                        <span class="badge badge-income">
-                                            PEMASUKAN
-                                        </span>
-
-                                    <?php else: ?>
-
-                                        <span class="badge badge-expense">
-                                            PENGELUARAN
-                                        </span>
-
-                                    <?php endif; ?>
-                                </td>
-
-                                <td>
-                                    <?php echo h(
-                                        str_replace(
-                                            '_',
-                                            ' ',
-                                            $row['sumber']
-                                        )
-                                    ); ?>
-                                </td>
-
-                                <td>
-                                    <?php echo h($row['kategori']); ?>
-                                </td>
-
-                                <td>
-                                    <?php echo h($row['jenis'] ?: '-'); ?>
-                                </td>
-
-                                <td class="money net-positive">
-                                    <?php
-                                    echo (float) $row['masuk'] > 0
-                                        ? rupiah($row['masuk'])
-                                        : '-';
-                                    ?>
-                                </td>
-
-                                <td class="money net-negative">
-                                    <?php
-                                    echo (float) $row['keluar'] > 0
-                                        ? rupiah($row['keluar'])
-                                        : '-';
-                                    ?>
-                                </td>
-
-                                <td>
-                                    <?php echo h($row['metode'] ?: '-'); ?>
-                                </td>
-
-                                <td>
-                                    <?php echo h($row['referensi'] ?: '-'); ?>
-                                </td>
-
-                                <td>
-                                    <?php echo h($row['keterangan'] ?: '-'); ?>
-                                </td>
-
+                                <th>Tanggal</th>
+                                <th>Nomor</th>
+                                <th>Tipe</th>
+                                <th>Sumber</th>
+                                <th>Kategori</th>
+                                <th>Jenis</th>
+                                <th class="right">Pemasukan</th>
+                                <th class="right">Pengeluaran</th>
+                                <th>Metode</th>
+                                <th>Referensi</th>
+                                <th>Keterangan</th>
                             </tr>
+                        </thead>
 
-                        <?php endforeach; ?>
+                        <tbody>
 
-                    </tbody>
+                            <?php foreach ($cashRows as $row): ?>
 
-                </table>
+                                    <tr>
 
-            </div>
+                                        <td>
+                                            <?php echo h($row['tanggal']); ?>
+                                        </td>
+
+                                        <td>
+                                            <strong>
+                                                <?php echo h($row['nomor']); ?>
+                                            </strong>
+                                        </td>
+
+                                        <td>
+                                            <?php if ($row['tipe'] === 'PEMASUKAN'): ?>
+
+                                                    <span class="badge badge-income">
+                                                        PEMASUKAN
+                                                    </span>
+
+                                            <?php else: ?>
+
+                                                    <span class="badge badge-expense">
+                                                        PENGELUARAN
+                                                    </span>
+
+                                            <?php endif; ?>
+                                        </td>
+
+                                        <td>
+                                            <?php echo h(
+                                                str_replace(
+                                                    '_',
+                                                    ' ',
+                                                    $row['sumber']
+                                                )
+                                            ); ?>
+                                        </td>
+
+                                        <td>
+                                            <?php echo h($row['kategori']); ?>
+                                        </td>
+
+                                        <td>
+                                            <?php echo h($row['jenis'] ?: '-'); ?>
+                                        </td>
+
+                                        <td class="money net-positive">
+                                            <?php
+                                            echo (float) $row['masuk'] > 0
+                                                ? rupiah($row['masuk'])
+                                                : '-';
+                                            ?>
+                                        </td>
+
+                                        <td class="money net-negative">
+                                            <?php
+                                            echo (float) $row['keluar'] > 0
+                                                ? rupiah($row['keluar'])
+                                                : '-';
+                                            ?>
+                                        </td>
+
+                                        <td>
+                                            <?php echo h($row['metode'] ?: '-'); ?>
+                                        </td>
+
+                                        <td>
+                                            <?php echo h($row['referensi'] ?: '-'); ?>
+                                        </td>
+
+                                        <td>
+                                            <?php echo h($row['keterangan'] ?: '-'); ?>
+                                        </td>
+
+                                    </tr>
+
+                            <?php endforeach; ?>
+
+                        </tbody>
+
+                    </table>
+
+                </div>
 
         <?php endif; ?>
 
@@ -3063,11 +3183,10 @@ require_once __DIR__ . '/../includes/header.php';
 
     <div class="report-note">
         <strong>Catatan laporan:</strong>
-        pembayaran penjualan dicatat sebagai pemasukan ketika pembayaran
-        benar-benar diterima. Pembayaran pembelian alat berat dicatat sebagai
-        pengeluaran ketika termin dibayar, sedangkan pembelian sparepart
-        dicatat sebagai pengeluaran ketika transaksi berstatus SELESAI.
-        Pengeluaran non-pembelian dikelompokkan berdasarkan
+        pembayaran penjualan dicatat sebagai kas masuk ketika benar-benar diterima.
+        Pembayaran pembelian alat berat dan sparepart dicatat sebagai kas keluar
+        ketika benar-benar dibayar. Pembelian yang belum terjual menjadi persediaan,
+        sedangkan HPP hanya diakui saat barang terjual. Pengeluaran non-pembelian dikelompokkan berdasarkan
         <em>kelompok_laporan</em> pada kategori keuangan.
     </div>
 
@@ -3082,20 +3201,57 @@ require_once __DIR__ . '/../includes/header.php';
     function monthTitle(period) { const p = String(period || '').split('-'); const n = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']; return p.length === 2 ? (n[Number(p[1]) - 1] || p[1]) + ' ' + p[0] : (period || '-'); }
     function reportRowsHtml(rows, emptyText) { if (!rows || rows.length === 0) return '<div class="client-report-empty">' + escapeReportText(emptyText) + '</div>'; return '<table class="client-report-table"><tbody>' + rows.map(row => '<tr><td class="indent"><strong>' + escapeReportText(row.label || '-') + '</strong>' + (row.detail ? '<div class="report-note" style="margin-top:2px">' + escapeReportText(row.detail) + '</div>' : '') + (row.tanggal ? '<div class="report-note" style="margin-top:2px">' + escapeReportText(formatReportDate(row.tanggal)) + '</div>' : '') + '</td><td class="money">' + formatReportMoney(row.nominal) + '</td></tr>').join('') + '</tbody></table>'; }
     function sectionHtml(title, rows, emptyText) { const total = (rows || []).reduce((sum, row) => sum + Number(row.nominal || 0), 0); return '<div class="client-report-section"><div class="client-report-section-title">' + escapeReportText(title) + '</div>' + reportRowsHtml(rows, emptyText) + '<table class="client-report-table"><tbody><tr class="subtotal"><td>Jumlah ' + escapeReportText(title) + '</td><td class="money">' + formatReportMoney(total) + '</td></tr></tbody></table></div>'; }
-    function showMonthlyReport(period) { const selector = document.getElementById('reportMonth'); const selected = period || (selector ? selector.value : ''); const data = monthlyReportData[selected]; if (!data) { alert('Data laporan bulan tersebut tidak tersedia.'); return; } const sales = (data.pendapatan_penjualan || []).reduce((s, r) => s + Number(r.nominal || 0), 0); const nonSales = (data.pendapatan_non_penjualan || []).reduce((s, r) => s + Number(r.nominal || 0), 0); const purchases = (data.belanja_pembelian || []).reduce((s, r) => s + Number(r.nominal || 0), 0); const assets = (data.modal_aset || []).reduce((s, r) => s + Number(r.nominal || 0), 0); const ops = (data.beban_operasional || []).reduce((s, r) => s + Number(r.nominal || 0), 0); const other = (data.pengeluaran_lainnya || []).reduce((s, r) => s + Number(r.nominal || 0), 0); const income = sales + nonSales; const expense = purchases + assets + ops + other; const net = income - expense; let html = '<div class="client-report"><div class="client-report-title"><strong>PT. ASRINDO GLOBAL MANDIRI</strong><span>LAPORAN LABA RUGI</span><span>' + escapeReportText(monthTitle(selected)) + '</span></div><div class="client-report-section"><div class="client-report-section-title">Pendapatan</div>' + reportRowsHtml(data.pendapatan_penjualan, 'Tidak ada pendapatan penjualan pada bulan ini.') + reportRowsHtml(data.pendapatan_non_penjualan, 'Tidak ada pendapatan non penjualan pada bulan ini.') + '<table class="client-report-table"><tbody><tr class="subtotal"><td>Jumlah Pendapatan</td><td class="money">' + formatReportMoney(income) + '</td></tr></tbody></table></div>' + sectionHtml('Beban Belanja Modal', data.belanja_pembelian, 'Tidak ada pembayaran pembelian pada bulan ini.') + sectionHtml('Beban Belanja Modal Aset', data.modal_aset, 'Tidak ada pengeluaran modal aset pada bulan ini.') + sectionHtml('Beban Operasional', data.beban_operasional, 'Tidak ada beban operasional pada bulan ini.'); if (other > 0) html += sectionHtml('Pengeluaran Lainnya', data.pengeluaran_lainnya, 'Tidak ada pengeluaran lainnya pada bulan ini.'); html += '<div class="client-report-section"><table class="client-report-table"><tbody><tr class="grand-total"><td>TOTAL PENGELUARAN</td><td class="money">' + formatReportMoney(expense) + '</td></tr><tr class="profit"><td>LABA / RUGI</td><td class="money ' + (net >= 0 ? 'month-value-positive' : 'month-value-negative') + '">' + formatReportMoney(net) + '</td></tr></tbody></table></div><div class="client-report-note">Pendapatan penjualan dihitung dari pemasukan yang benar-benar diterima pada bulan tersebut. Pembayaran pembelian alat berat dihitung ketika termin dibayar, sedangkan pembelian sparepart dihitung ketika transaksi menghasilkan pengeluaran. Pengeluaran non-pembelian mengikuti kelompok laporan pada kategori keuangan.</div></div>'; document.getElementById('monthlyReportContent').innerHTML = html; document.getElementById('monthlyReportModalSubtitle').textContent = 'Laporan bulan ' + monthTitle(selected); document.getElementById('monthlyReportModal').classList.add('show'); }
-    function closeMonthlyReport() { document.getElementById('monthlyReportModal').classList.remove('show'); }
+    function showMonthlyReport(period) {
+        const selector = document.getElementById('reportMonth');
+        const selected = period || (selector ? selector.value : '');
+        const data = monthlyReportData[selected];
+        if (!data) { alert('Data laporan bulan tersebut tidak tersedia.'); return; }
+        const sales = (data.pendapatan_penjualan || []).reduce((s, r) => s + Number(r.nominal || 0), 0);
+        const nonSales = (data.pendapatan_non_penjualan || []).reduce((s, r) => s + Number(r.nominal || 0), 0);
+        const hpp = (data.hpp || []).reduce((s, r) => s + Number(r.nominal || 0), 0);
+        const purchases = (data.belanja_pembelian_kas || []).reduce((s, r) => s + Number(r.nominal || 0), 0);
+        const assets = (data.modal_aset || []).reduce((s, r) => s + Number(r.nominal || 0), 0);
+        const ops = (data.beban_operasional || []).reduce((s, r) => s + Number(r.nominal || 0), 0);
+        const other = (data.pengeluaran_lainnya || []).reduce((s, r) => s + Number(r.nominal || 0), 0);
+        const income = sales + nonSales;
+        const gross = income - hpp;
+        const cashOut = purchases + assets + ops + other;
+        const cashIn = Number(data.pemasukan_kas || 0);
+        const cashNet = cashIn - cashOut;
+        let html = '<div class="client-report">' +
+            '<div class="client-report-title"><strong>PT. ASRINDO GLOBAL MANDIRI</strong><span>LAPORAN KEUANGAN BULANAN</span><span>' + escapeReportText(monthTitle(selected)) + '</span></div>' +
+            '<div class="client-report-section"><div class="client-report-section-title">Laba Rugi</div>' +
+            reportRowsHtml(data.pendapatan_penjualan, 'Tidak ada pendapatan penjualan pada bulan ini.') +
+            reportRowsHtml(data.pendapatan_non_penjualan, 'Tidak ada pendapatan non penjualan pada bulan ini.') +
+            '<table class="client-report-table"><tbody><tr class="subtotal"><td>Total Pendapatan</td><td class="money">' + formatReportMoney(income) + '</td></tr></tbody></table>' +
+            sectionHtml('HPP Barang Terjual', data.hpp, 'Tidak ada HPP pada bulan ini.') +
+            '<table class="client-report-table"><tbody><tr class="subtotal"><td>LABA KOTOR</td><td class="money">' + formatReportMoney(gross) + '</td></tr></tbody></table>' +
+            sectionHtml('Beban Operasional', data.beban_operasional, 'Tidak ada beban operasional pada bulan ini.') +
+            (other > 0 ? sectionHtml('Pengeluaran Lainnya', data.pengeluaran_lainnya, 'Tidak ada pengeluaran lainnya pada bulan ini.') : '') +
+            '<table class="client-report-table"><tbody><tr class="grand-total"><td>LABA / RUGI BERSIH</td><td class="money ' + (gross - ops - other >= 0 ? 'month-value-positive' : 'month-value-negative') + '">' + formatReportMoney(gross - ops - other) + '</td></tr></tbody></table></div>' +
+            '<div class="client-report-section"><div class="client-report-section-title">Arus Kas</div>' +
+            '<table class="client-report-table"><tbody><tr><td class="indent">Kas Masuk Aktual</td><td class="money">' + formatReportMoney(cashIn) + '</td></tr><tr><td class="indent">Pembayaran Pembelian Alat Berat & Sparepart</td><td class="money">' + formatReportMoney(purchases) + '</td></tr><tr><td class="indent">Belanja Modal Aset</td><td class="money">' + formatReportMoney(assets) + '</td></tr><tr><td class="indent">Beban Operasional & Lainnya</td><td class="money">' + formatReportMoney(ops + other) + '</td></tr><tr class="grand-total"><td>ARUS KAS BERSIH</td><td class="money ' + (cashNet >= 0 ? 'month-value-positive' : 'month-value-negative') + '">' + formatReportMoney(cashNet) + '</td></tr></tbody></table></div>' +
+            '<div class="client-report-note">Pembelian yang belum terjual tidak dibebankan sebagai HPP. Pembayaran pembelian tetap mengurangi kas pada saat benar-benar dibayar. HPP hanya berasal dari detail penjualan yang memiliki nilai HPP.</div></div>';
+        document.getElementById('monthlyReportContent').innerHTML = html;
+        document.getElementById('monthlyReportModalSubtitle').textContent = 'Laporan bulan ' + monthTitle(selected);
+        document.getElementById('monthlyReportModal').classList.add('show');
+    }
+    function closeMonthlyReport() {
+        document.getElementById('monthlyReportModal').classList.remove('show');
+    }
     function printReportWithCustomName() {
-    const tanggalAwal = "<?php echo h($tanggalAwal); ?>";
-    const tanggalAkhir = "<?php echo h($tanggalAkhir); ?>";
-    const originalTitle = document.title;
-    document.title = "Laporan_Keuangan_Periode_<?php echo h($tanggalAwalLabel); ?>_sd_<?php echo h($tanggalAkhirLabel); ?>";
-    window.print();
-    setTimeout(() => {
-        document.title = originalTitle;
-    }, 1000);
-}
-    document.getElementById('reportMonth').addEventListener('change', function () { showMonthlyReport(this.value); });
-    document.getElementById('monthlyReportModal').addEventListener('click', function (e) { if (e.target === this) closeMonthlyReport(); }); document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeMonthlyReport(); });
+        const originalTitle = document.title;
+        document.title = "Laporan_Keuangan_Periode_<?php echo h($tanggalAwalLabel); ?>_sd_<?php echo h($tanggalAkhirLabel); ?>";
+        window.print();
+        setTimeout(() => { document.title = originalTitle; }, 1000);
+    }
+    // Dropdown hanya memilih bulan; modal dibuka melalui tombol Tampilkan Laporan.
+    document.getElementById('monthlyReportModal').addEventListener('click', function (e) {
+        if (e.target === this) closeMonthlyReport();
+    });
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closeMonthlyReport();
+    });
 </script>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

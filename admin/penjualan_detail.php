@@ -1099,11 +1099,27 @@ $subtotalReal = 0;
 $totalHpp = 0;
 $totalLaba = 0;
 
-foreach ($details as $detail) {
+foreach ($details as &$detail) {
+    // Ambil HPP secara dinamis (live)
+    $liveHpp = getUnitHpp($pdo, (int)$detail['alat_berat_id']);
+    $liveLaba = $detail['subtotal'] - $liveHpp;
+    
+    // Jika ada perubahan, update di database agar sinkron dengan laporan akuntansi
+    // NOTE: 'laba' adalah GENERATED COLUMN, jadi kita hanya mengupdate 'hpp'
+    if (abs((float)$detail['hpp'] - $liveHpp) > 0.001) {
+        $stmtUpdate = $pdo->prepare("UPDATE penjualan_detail SET hpp = ? WHERE id = ?");
+        $stmtUpdate->execute([$liveHpp, $detail['id']]);
+    }
+    
+    // Timpa nilai HPP dan Laba statis di DB dengan nilai dinamis untuk tampilan
+    $detail['hpp'] = $liveHpp;
+    $detail['laba'] = $liveLaba;
+
     $subtotalReal += (float)$detail['subtotal'];
     $totalHpp += (float)$detail['hpp'];
     $totalLaba += (float)$detail['laba'];
 }
+unset($detail);
 
 $ppn = (float)($sale['ppn'] ?? 0);
 $ppnNominal = $subtotalReal * ($ppn / 100);
