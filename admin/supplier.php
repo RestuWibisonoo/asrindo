@@ -240,6 +240,405 @@ $suppliers = $pdo->query("
 
 $totalSupplier = count($suppliers);
 
+$extraHead = <<<'HTML'
+<style>
+/*
+|--------------------------------------------------------------------------
+| CSS halaman supplier
+|--------------------------------------------------------------------------
+| Tidak membuat file CSS baru. Style diletakkan di halaman agar file ini
+| langsung dapat digunakan tanpa mengubah assets/css yang sudah ada.
+| Style menggunakan namespace supplier-* agar tidak mengganggu halaman lain.
+|--------------------------------------------------------------------------
+*/
+
+.page-alert {
+    margin: 0 0 18px;
+    padding: 11px 14px;
+    border-radius: 5px;
+    font-size: 13px;
+}
+
+.page-alert.success {
+    color: #087443;
+    background: #effcf5;
+    border: 1px solid #bcebd2;
+}
+
+.page-alert.error {
+    color: #9b1c31;
+    background: #fff0f2;
+    border: 1px solid #ffc8d0;
+}
+
+.supplier-panel {
+    overflow: visible;
+}
+
+.panel-subtitle {
+    display: block;
+    margin-top: 3px;
+    color: #718096;
+    font-size: 12px;
+}
+
+.supplier-toolbar {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 15px 16px;
+    border-bottom: 1px solid #dfe5ed;
+}
+
+.supplier-search {
+    flex: 1;
+    max-width: 480px;
+}
+
+.supplier-page-size {
+    width: 130px;
+}
+
+.supplier-toolbar label {
+    display: block;
+    margin-bottom: 6px;
+    color: #52657f;
+    font-size: 11px;
+}
+
+.supplier-toolbar input,
+.supplier-toolbar select {
+    width: 100%;
+    height: 36px;
+    box-sizing: border-box;
+    border: 1px solid #bdcbe0;
+    border-radius: 4px;
+    background: #fff;
+    color: #172d4e;
+    padding: 7px 10px;
+    outline: none;
+}
+
+.supplier-toolbar input:focus,
+.supplier-toolbar select:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 2px rgba(13,110,253,.08);
+}
+
+.supplier-table {
+    min-width: 980px;
+}
+
+.supplier-table th,
+.supplier-table td {
+    vertical-align: middle;
+}
+
+.supplier-filter-row th {
+    padding: 8px 7px;
+    background: #f7f9fc;
+}
+
+.supplier-filter-row input {
+    width: 100%;
+    height: 32px;
+    box-sizing: border-box;
+    border: 1px solid #bdcbe0;
+    border-radius: 4px;
+    padding: 5px 7px;
+    font-size: 11px;
+    color: #172d4e;
+    outline: none;
+}
+
+.supplier-filter-row input:focus {
+    border-color: #0d6efd;
+}
+
+.supplier-actions {
+    display: flex;
+    gap: 5px;
+    white-space: nowrap;
+}
+
+.btn-small {
+    min-width: 42px;
+    height: 30px;
+    padding: 0 9px;
+    border: 1px solid #bdcbe0;
+    border-radius: 4px;
+    background: #fff;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.btn-edit {
+    color: #28558f;
+}
+
+.btn-edit:hover {
+    border-color: #0d6efd;
+    color: #0d6efd;
+}
+
+.btn-delete {
+    color: #dc3545;
+    border-color: #f0b9c0;
+}
+
+.btn-delete:hover {
+    background: #fff5f6;
+}
+
+.supplier-table-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 15px;
+    padding: 12px 16px;
+    color: #718096;
+    font-size: 12px;
+}
+
+.supplier-pagination {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.supplier-pagination button {
+    min-width: 34px;
+    height: 32px;
+    padding: 0 9px;
+    border: 1px solid #d4deeb;
+    border-radius: 4px;
+    background: #fff;
+    color: #52657f;
+    cursor: pointer;
+    font-size: 11px;
+}
+
+.supplier-pagination button:hover:not(:disabled) {
+    border-color: #0d6efd;
+    color: #0d6efd;
+}
+
+.supplier-pagination button.active {
+    border-color: #0d6efd;
+    background: #0d6efd;
+    color: #fff;
+}
+
+.supplier-pagination button:disabled {
+    cursor: not-allowed;
+    opacity: .5;
+}
+
+.supplier-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+    box-sizing: border-box;
+    background: rgba(23, 45, 78, .55);
+}
+
+.supplier-modal.show {
+    display: flex;
+}
+
+.supplier-modal-box {
+    width: min(720px, 100%);
+    max-height: calc(100vh - 36px);
+    overflow-y: auto;
+    border-radius: 6px;
+    background: #fff;
+    box-shadow: 0 15px 45px rgba(0,0,0,.18);
+}
+
+.supplier-modal-small {
+    width: min(480px, 100%);
+}
+
+.supplier-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 52px;
+    padding: 0 16px;
+    box-sizing: border-box;
+    border-bottom: 1px solid #dfe5ed;
+}
+
+.supplier-modal-header h3 {
+    margin: 0;
+    color: #183052;
+    font-size: 15px;
+}
+
+.supplier-modal-close {
+    width: 34px;
+    height: 34px;
+    border: 0;
+    background: transparent;
+    color: #718096;
+    font-size: 25px;
+    cursor: pointer;
+}
+
+.supplier-modal-close:hover {
+    color: #183052;
+}
+
+.supplier-modal-body {
+    padding: 18px 16px;
+}
+
+.supplier-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.supplier-field {
+    min-width: 0;
+}
+
+.supplier-field-full {
+    grid-column: 1 / -1;
+}
+
+.supplier-field label {
+    display: block;
+    margin-bottom: 6px;
+    color: #183052;
+    font-size: 11px;
+}
+
+.supplier-field label span {
+    color: #dc3545;
+}
+
+.supplier-field input,
+.supplier-field textarea {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #bdcbe0;
+    border-radius: 4px;
+    background: #fff;
+    color: #172d4e;
+    padding: 8px 10px;
+    font-size: 12px;
+    outline: none;
+}
+
+.supplier-field input {
+    height: 36px;
+}
+
+.supplier-field textarea {
+    resize: vertical;
+    min-height: 76px;
+}
+
+.supplier-field input:focus,
+.supplier-field textarea:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 2px rgba(13,110,253,.08);
+}
+
+.supplier-modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 12px 16px;
+    border-top: 1px solid #dfe5ed;
+}
+
+.btn-primary,
+.btn-secondary,
+.btn-danger {
+    min-height: 36px;
+    padding: 0 15px;
+    border-radius: 4px;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.btn-primary {
+    border: 0;
+    background: #0d6efd;
+    color: #fff;
+}
+
+.btn-primary:hover {
+    background: #0b5ed7;
+}
+
+.btn-secondary {
+    border: 0;
+    background: #718096;
+    color: #fff;
+}
+
+.btn-danger {
+    border: 0;
+    background: #dc3545;
+    color: #fff;
+}
+
+.supplier-delete-note {
+    margin-top: 12px;
+    color: #9b1c31;
+    font-size: 11px;
+}
+
+@media (max-width: 800px) {
+    .supplier-toolbar {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .supplier-search,
+    .supplier-page-size {
+        width: 100%;
+        max-width: none;
+    }
+
+    .supplier-table-footer {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .supplier-pagination {
+        justify-content: flex-start;
+    }
+
+    .supplier-form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .supplier-field-full {
+        grid-column: auto;
+    }
+
+    .supplier-modal {
+        padding: 10px;
+    }
+
+    .supplier-modal-box {
+        max-height: calc(100vh - 20px);
+    }
+}
+</style>
+HTML;
+
 require __DIR__ . '/../includes/header.php';
 ?>
 
@@ -716,402 +1115,6 @@ require __DIR__ . '/../includes/header.php';
 </div>
 
 
-<style>
-/*
-|--------------------------------------------------------------------------
-| CSS halaman supplier
-|--------------------------------------------------------------------------
-| Tidak membuat file CSS baru. Style diletakkan di halaman agar file ini
-| langsung dapat digunakan tanpa mengubah assets/css yang sudah ada.
-| Style menggunakan namespace supplier-* agar tidak mengganggu halaman lain.
-|--------------------------------------------------------------------------
-*/
-
-.page-alert {
-    margin: 0 0 18px;
-    padding: 11px 14px;
-    border-radius: 5px;
-    font-size: 13px;
-}
-
-.page-alert.success {
-    color: #087443;
-    background: #effcf5;
-    border: 1px solid #bcebd2;
-}
-
-.page-alert.error {
-    color: #9b1c31;
-    background: #fff0f2;
-    border: 1px solid #ffc8d0;
-}
-
-.supplier-panel {
-    overflow: visible;
-}
-
-.panel-subtitle {
-    display: block;
-    margin-top: 3px;
-    color: #718096;
-    font-size: 12px;
-}
-
-.supplier-toolbar {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 18px;
-    padding: 15px 16px;
-    border-bottom: 1px solid #dfe5ed;
-}
-
-.supplier-search {
-    flex: 1;
-    max-width: 480px;
-}
-
-.supplier-page-size {
-    width: 130px;
-}
-
-.supplier-toolbar label {
-    display: block;
-    margin-bottom: 6px;
-    color: #52657f;
-    font-size: 11px;
-}
-
-.supplier-toolbar input,
-.supplier-toolbar select {
-    width: 100%;
-    height: 36px;
-    box-sizing: border-box;
-    border: 1px solid #bdcbe0;
-    border-radius: 4px;
-    background: #fff;
-    color: #172d4e;
-    padding: 7px 10px;
-    outline: none;
-}
-
-.supplier-toolbar input:focus,
-.supplier-toolbar select:focus {
-    border-color: #0d6efd;
-    box-shadow: 0 0 0 2px rgba(13,110,253,.08);
-}
-
-.supplier-table {
-    min-width: 980px;
-}
-
-.supplier-table th,
-.supplier-table td {
-    vertical-align: middle;
-}
-
-.supplier-filter-row th {
-    padding: 8px 7px;
-    background: #f7f9fc;
-}
-
-.supplier-filter-row input {
-    width: 100%;
-    height: 32px;
-    box-sizing: border-box;
-    border: 1px solid #bdcbe0;
-    border-radius: 4px;
-    padding: 5px 7px;
-    font-size: 11px;
-    color: #172d4e;
-    outline: none;
-}
-
-.supplier-filter-row input:focus {
-    border-color: #0d6efd;
-}
-
-.supplier-actions {
-    display: flex;
-    gap: 5px;
-    white-space: nowrap;
-}
-
-.btn-small {
-    min-width: 42px;
-    height: 30px;
-    padding: 0 9px;
-    border: 1px solid #bdcbe0;
-    border-radius: 4px;
-    background: #fff;
-    font-size: 11px;
-    cursor: pointer;
-}
-
-.btn-edit {
-    color: #28558f;
-}
-
-.btn-edit:hover {
-    border-color: #0d6efd;
-    color: #0d6efd;
-}
-
-.btn-delete {
-    color: #dc3545;
-    border-color: #f0b9c0;
-}
-
-.btn-delete:hover {
-    background: #fff5f6;
-}
-
-.supplier-table-footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 15px;
-    padding: 12px 16px;
-    color: #718096;
-    font-size: 12px;
-}
-
-.supplier-pagination {
-    display: flex;
-    gap: 4px;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-}
-
-.supplier-pagination button {
-    min-width: 34px;
-    height: 32px;
-    padding: 0 9px;
-    border: 1px solid #d4deeb;
-    border-radius: 4px;
-    background: #fff;
-    color: #52657f;
-    cursor: pointer;
-    font-size: 11px;
-}
-
-.supplier-pagination button:hover:not(:disabled) {
-    border-color: #0d6efd;
-    color: #0d6efd;
-}
-
-.supplier-pagination button.active {
-    border-color: #0d6efd;
-    background: #0d6efd;
-    color: #fff;
-}
-
-.supplier-pagination button:disabled {
-    cursor: not-allowed;
-    opacity: .5;
-}
-
-.supplier-modal {
-    position: fixed;
-    inset: 0;
-    z-index: 9999;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    padding: 18px;
-    box-sizing: border-box;
-    background: rgba(23, 45, 78, .55);
-}
-
-.supplier-modal.show {
-    display: flex;
-}
-
-.supplier-modal-box {
-    width: min(720px, 100%);
-    max-height: calc(100vh - 36px);
-    overflow-y: auto;
-    border-radius: 6px;
-    background: #fff;
-    box-shadow: 0 15px 45px rgba(0,0,0,.18);
-}
-
-.supplier-modal-small {
-    width: min(480px, 100%);
-}
-
-.supplier-modal-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    min-height: 52px;
-    padding: 0 16px;
-    box-sizing: border-box;
-    border-bottom: 1px solid #dfe5ed;
-}
-
-.supplier-modal-header h3 {
-    margin: 0;
-    color: #183052;
-    font-size: 15px;
-}
-
-.supplier-modal-close {
-    width: 34px;
-    height: 34px;
-    border: 0;
-    background: transparent;
-    color: #718096;
-    font-size: 25px;
-    cursor: pointer;
-}
-
-.supplier-modal-close:hover {
-    color: #183052;
-}
-
-.supplier-modal-body {
-    padding: 18px 16px;
-}
-
-.supplier-form-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px;
-}
-
-.supplier-field {
-    min-width: 0;
-}
-
-.supplier-field-full {
-    grid-column: 1 / -1;
-}
-
-.supplier-field label {
-    display: block;
-    margin-bottom: 6px;
-    color: #183052;
-    font-size: 11px;
-}
-
-.supplier-field label span {
-    color: #dc3545;
-}
-
-.supplier-field input,
-.supplier-field textarea {
-    width: 100%;
-    box-sizing: border-box;
-    border: 1px solid #bdcbe0;
-    border-radius: 4px;
-    background: #fff;
-    color: #172d4e;
-    padding: 8px 10px;
-    font-size: 12px;
-    outline: none;
-}
-
-.supplier-field input {
-    height: 36px;
-}
-
-.supplier-field textarea {
-    resize: vertical;
-    min-height: 76px;
-}
-
-.supplier-field input:focus,
-.supplier-field textarea:focus {
-    border-color: #0d6efd;
-    box-shadow: 0 0 0 2px rgba(13,110,253,.08);
-}
-
-.supplier-modal-footer {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 8px;
-    padding: 12px 16px;
-    border-top: 1px solid #dfe5ed;
-}
-
-.btn-primary,
-.btn-secondary,
-.btn-danger {
-    min-height: 36px;
-    padding: 0 15px;
-    border-radius: 4px;
-    font-size: 11px;
-    cursor: pointer;
-}
-
-.btn-primary {
-    border: 0;
-    background: #0d6efd;
-    color: #fff;
-}
-
-.btn-primary:hover {
-    background: #0b5ed7;
-}
-
-.btn-secondary {
-    border: 0;
-    background: #718096;
-    color: #fff;
-}
-
-.btn-danger {
-    border: 0;
-    background: #dc3545;
-    color: #fff;
-}
-
-.supplier-delete-note {
-    margin-top: 12px;
-    color: #9b1c31;
-    font-size: 11px;
-}
-
-@media (max-width: 800px) {
-    .supplier-toolbar {
-        align-items: stretch;
-        flex-direction: column;
-    }
-
-    .supplier-search,
-    .supplier-page-size {
-        width: 100%;
-        max-width: none;
-    }
-
-    .supplier-table-footer {
-        align-items: flex-start;
-        flex-direction: column;
-    }
-
-    .supplier-pagination {
-        justify-content: flex-start;
-    }
-
-    .supplier-form-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .supplier-field-full {
-        grid-column: auto;
-    }
-
-    .supplier-modal {
-        padding: 10px;
-    }
-
-    .supplier-modal-box {
-        max-height: calc(100vh - 20px);
-    }
-}
-</style>
 
 
 <script>
