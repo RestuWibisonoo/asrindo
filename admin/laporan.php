@@ -1873,99 +1873,106 @@ require_once __DIR__ . '/../includes/header.php';
 
     .statement-grid {
         display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 10px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
         align-items: start
+    }
+
+    .statement-grid .statement-card:nth-child(3) {
+        grid-column: 2;
+        grid-row: 1 / span 2;
     }
 
     .statement-card {
         background: #fff;
-        border: 1px solid #aeb8c5;
-        overflow: hidden
+        border: 1px solid #dce3eb;
+        border-radius: 7px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
     }
 
     .statement-title {
-        min-height: 48px;
-        padding: 8px 7px;
+        padding: 13px 16px;
+        border-bottom: 1px solid #dce3eb;
         text-align: center;
-        font-size: 11px;
+        font-size: 14px;
         font-weight: 700;
-        line-height: 1.3;
-        color: #1f2937;
-        border-bottom: 1px solid #aeb8c5
+        color: #172b4d;
     }
 
     .statement-title span {
         display: block;
-        font-weight: 400
+        margin-top: 3px;
+        color: #8390a3;
+        font-size: 11px;
+        font-weight: 400;
     }
 
     .statement-table {
         width: 100%;
         border-collapse: collapse;
-        table-layout: fixed
     }
 
     .statement-table td {
-        padding: 5px 7px;
-        border-bottom: 1px solid #edf0f3;
-        font-size: 10px;
-        vertical-align: top
+        padding: 9px 10px;
+        border-bottom: 1px solid #e8edf2;
+        font-size: 12px;
+        vertical-align: top;
     }
 
     .statement-table td:last-child {
-        width: 43%;
         text-align: right;
-        white-space: nowrap
+        white-space: nowrap;
+        font-weight: 600;
     }
 
     .statement-table .section td {
-        padding-top: 7px;
-        padding-bottom: 4px;
-        background: #d9ead3;
+        background: #f5f7fa;
+        color: #526b8d;
         font-weight: 700;
-        border-bottom: 1px solid #b8cdb2
+        border-bottom: 1px solid #dce3eb;
+        text-align: left !important;
     }
 
     .statement-table .section.liability td {
-        background: #fcecc5;
-        border-bottom-color: #e6d39f
+        background: #f5f7fa;
+        border-bottom-color: #dce3eb;
     }
 
     .statement-table .section.equity td {
-        background: #e7d9f5;
-        border-bottom-color: #cdb5e2
+        background: #f5f7fa;
+        border-bottom-color: #dce3eb;
     }
 
     .statement-table .total td {
         font-weight: 700;
-        border-top: 1px solid #7f8b99;
-        background: #f7f9fb
+        border-top: 1px solid #dce3eb;
+        background: #f7f9fb;
     }
 
     .statement-table .grand-total td {
         font-weight: 700;
-        border-top: 2px double #596575;
-        background: #eef3f8
+        border-top: 2px solid #dce3eb;
+        background: #eef3f8;
     }
 
     .statement-table .indent td:first-child {
-        padding-left: 17px
+        padding-left: 20px;
     }
 
     .statement-table .muted td {
-        color: #718096
+        color: #718096;
     }
 
     @media(max-width:1150px) {
         .statement-grid {
-            grid-template-columns: repeat(2, minmax(0, 1fr))
-        }
-    }
-
-    @media(max-width:600px) {
-        .statement-grid {
             grid-template-columns: 1fr
+        }
+
+        .statement-grid .statement-card:nth-child(3) {
+            grid-column: auto;
+            grid-row: auto;
         }
     }
 
@@ -1974,7 +1981,12 @@ require_once __DIR__ . '/../includes/header.php';
     }
 
     .statement-print {
-        display: none
+        margin: 24px 0;
+    }
+
+    .laba-rugi-print-container,
+    .monthly-print-container {
+        display: none;
     }
 
     .btn-print-report {
@@ -2019,14 +2031,30 @@ require_once __DIR__ . '/../includes/header.php';
             margin: 0 !important
         }
 
-        .report-page>*:not(.statement-print) {
+        .report-page>*:not(.laba-rugi-print-container):not(.monthly-print-container) {
             display: none !important
         }
 
         .statement-print {
+            display: none !important;
+        }
+
+        .laba-rugi-print-container {
             display: block !important;
             width: 100%;
-            margin: 0
+        }
+
+        body.printing-monthly .laba-rugi-print-container {
+            display: none !important;
+        }
+
+        .monthly-print-container {
+            display: none !important;
+        }
+
+        body.printing-monthly .monthly-print-container {
+            display: block !important;
+            width: 100%;
         }
 
         .statement-heading {
@@ -2175,233 +2203,9 @@ require_once __DIR__ . '/../includes/header.php';
         </strong>
     </div>
 
-    <div class="statement-print">
-        <div class="statement-heading">Laporan Keuangan Utama</div>
-        <div class="statement-period">
-            Periode laporan: <?php echo h(date('d F Y', strtotime($tanggalAwal))); ?>
-            s.d. <?php echo h(date('d F Y', strtotime($tanggalAkhir))); ?>
-        </div>
 
-        <div class="statement-grid">
-            <section class="statement-card">
-                <div class="statement-title">Laporan Laba/Rugi<span>Asrindo</span><span>Periode
-                        <?php echo h($tanggalAwalLabel); ?> s.d.
-                        <?php echo h($tanggalAkhirLabel); ?></span><span>Disajikan dalam bentuk rupiah</span></div>
-                <table class="statement-table">
-                    <tbody>
-                        <tr class="section">
-                            <td colspan="2">PENDAPATAN</td>
-                        </tr>
-                        <?php foreach ($profitIncomeRows as $row): ?>
-                                <tr class="indent">
-                                    <td><?php echo h($row['label']); ?></td>
-                                    <td><?php echo rupiah($row['nominal']); ?></td>
-                                </tr>
-                        <?php endforeach; ?>
-                        <tr class="total">
-                            <td>TOTAL PENDAPATAN</td>
-                            <td><?php echo rupiah($printIncomeTotal); ?></td>
-                        </tr>
-                        <tr class="section">
-                            <td colspan="2">BEBAN POKOK PENDAPATAN</td>
-                        </tr>
-                        <?php foreach ($profitCogsRows as $row): ?>
-                                <tr class="indent">
-                                    <td><?php echo h($row['label']); ?></td>
-                                    <td><?php echo rupiah($row['nominal']); ?></td>
-                                </tr>
-                        <?php endforeach; ?>
-                        <tr class="total">
-                            <td>TOTAL BEBAN POKOK PENDAPATAN</td>
-                            <td><?php echo rupiah($printCogsTotal); ?></td>
-                        </tr>
-                        <tr class="section">
-                            <td colspan="2">BEBAN OPERASIONAL</td>
-                        </tr>
-                        <?php foreach ($profitOperatingRows as $row): ?>
-                                <tr class="indent">
-                                    <td><?php echo h($row['label']); ?></td>
-                                    <td><?php echo rupiah($row['nominal']); ?></td>
-                                </tr>
-                        <?php endforeach; ?>
-                        <tr class="total">
-                            <td>TOTAL BEBAN OPERASIONAL</td>
-                            <td><?php echo rupiah($printOperatingTotal); ?></td>
-                        </tr>
-                        <tr class="grand-total">
-                            <td>LABA / RUGI BERSIH</td>
-                            <td><?php echo rupiah($printNetTotal); ?></td>
-                        </tr>
-                    </tbody>
-                </table>
-            </section>
 
-            <section class="statement-card">
-                <div class="statement-title">Laporan Perubahan Modal<span>Asrindo</span><span>Periode
-                        <?php echo h($tanggalAwalLabel); ?> s.d.
-                        <?php echo h($tanggalAkhirLabel); ?></span><span>Disajikan dalam bentuk rupiah</span></div>
-                <table class="statement-table">
-                    <tbody>
-                        <tr class="indent">
-                            <td>Setoran Modal</td>
-                            <td><?php echo rupiah($modalAwal); ?></td>
-                        </tr>
-                        <tr class="indent">
-                            <td>Laba Bersih</td>
-                            <td><?php echo rupiah($labaRugiPeriode); ?></td>
-                        </tr>
-                        <tr class="indent">
-                            <td>Penghasilan Komprehensif</td>
-                            <td><?php echo rupiah($labaRugiPeriode); ?></td>
-                        </tr>
-                        <tr class="grand-total">
-                            <td>Saldo Per <?php echo h($tanggalAkhirLabel); ?></td>
-                            <td><?php echo rupiah($modalAwal + $labaRugiPeriode); ?></td>
-                        </tr>
-                    </tbody>
-                </table>
-            </section>
 
-            <section class="statement-card">
-                <div class="statement-title">Laporan Arus Kas<span>Asrindo</span><span>Periode
-                        <?php echo h($tanggalAwalLabel); ?> s.d.
-                        <?php echo h($tanggalAkhirLabel); ?></span><span>Disajikan dalam bentuk rupiah</span></div>
-                <table class="statement-table">
-                    <tbody>
-                        <tr class="section">
-                            <td colspan="2">ARUS KAS AKTIVITAS OPERASIONAL</td>
-                        </tr>
-                        <tr class="indent">
-                            <td>Penerimaan Kas</td>
-                            <td><?php echo rupiah($totalPemasukan); ?></td>
-                        </tr>
-                        <tr class="indent">
-                            <td>Pembayaran Pembelian Alat Berat & Sparepart</td>
-                            <td><?php echo rupiah(-$belanjaPembelian); ?></td>
-                        </tr>
-                        <tr class="indent">
-                            <td>Beban Operasional & Pengeluaran Lainnya</td>
-                            <td><?php echo rupiah(-$printOperatingTotal - $pengeluaranLainnya); ?></td>
-                        </tr>
-                        <tr class="total">
-                            <td>Kas Bersih Aktivitas Operasional</td>
-                            <td><?php echo rupiah($totalPemasukan - $belanjaPembelian - $printOperatingTotal - $pengeluaranLainnya); ?></td>
-                        </tr>
-                        <tr class="section">
-                            <td colspan="2">ARUS KAS AKTIVITAS INVESTASI</td>
-                        </tr>
-                        <?php foreach ($investmentRows as $row): ?>
-                                <tr class="indent">
-                                    <td><?php echo h($row['label']); ?></td>
-                                    <td><?php echo rupiah(-$row['nominal']); ?></td>
-                                </tr>
-                        <?php endforeach; ?>
-                        <tr class="total">
-                            <td>Kas Bersih Aktivitas Investasi</td>
-                            <td><?php echo rupiah(-$printInvestmentTotal); ?></td>
-                        </tr>
-                        <tr class="section">
-                            <td colspan="2">ARUS KAS AKTIVITAS PENDANAAN</td>
-                        </tr>
-                        <tr class="indent">
-                            <td>Penerimaan / Pembayaran Modal</td>
-                            <td><?php echo rupiah(0); ?></td>
-                        </tr>
-                        <tr class="total">
-                            <td>Perubahan Kas Periode</td>
-                            <td><?php echo rupiah($arusKasPeriode); ?></td>
-                        </tr>
-                        <tr class="indent">
-                            <td>Kas Awal Periode</td>
-                            <td><?php echo rupiah($kasAwalPeriode); ?></td>
-                        </tr>
-                        <tr class="grand-total">
-                            <td>KAS AKHIR PERIODE</td>
-                            <td><?php echo rupiah($kasAkhirPeriode); ?></td>
-                        </tr>
-                    </tbody>
-                </table>
-            </section>
-
-            <section class="statement-card">
-                <div class="statement-title">Laporan Posisi Keuangan<span>Asrindo</span><span>Periode
-                        <?php echo h($tanggalAwalLabel); ?> s.d.
-                        <?php echo h($tanggalAkhirLabel); ?></span><span>Disajikan dalam bentuk rupiah</span></div>
-                <table class="statement-table">
-                    <tbody>
-                        <tr class="section">
-                            <td colspan="2">ASET LANCAR</td>
-                        </tr>
-                        <tr class="indent">
-                            <td>Kas</td>
-                            <td><?php echo rupiah($printCashEnd); ?></td>
-                        </tr>
-                        <tr class="indent">
-                            <td>Piutang Penjualan</td>
-                            <td><?php echo rupiah($piutangPenjualan); ?></td>
-                        </tr>
-                        <?php foreach ($positionUnitRows as $row): ?>
-                                <tr class="indent">
-                                    <td><?php echo h($row['label']); ?></td>
-                                    <td><?php echo rupiah($row['nominal']); ?></td>
-                                </tr>
-                        <?php endforeach; ?>
-                        <?php if ($positionSparepartTotal > 0): ?>
-                                <tr class="indent">
-                                    <td>Sparepart</td>
-                                    <td><?php echo rupiah($positionSparepartTotal); ?></td>
-                                </tr>
-                        <?php endif; ?>
-                        <tr class="total">
-                            <td>Total Aset Lancar</td>
-                            <td><?php echo rupiah($printCashEnd + $piutangPenjualan + $persediaanTotal); ?></td>
-                        </tr>
-                        <tr class="section">
-                            <td colspan="2">ASET TETAP</td>
-                        </tr>
-                        <tr class="indent">
-                            <td>Aset Tetap</td>
-                            <td><?php echo rupiah($asetTetap); ?></td>
-                        </tr>
-                        <tr class="grand-total">
-                            <td>TOTAL ASET</td>
-                            <td><?php echo rupiah($totalAset); ?></td>
-                        </tr>
-                        <tr class="section liability">
-                            <td colspan="2">LIABILITAS</td>
-                        </tr>
-                        <tr class="indent">
-                            <td>Utang Usaha</td>
-                            <td><?php echo rupiah($totalLiabilitas); ?></td>
-                        </tr>
-                        <tr class="total">
-                            <td>TOTAL LIABILITAS</td>
-                            <td><?php echo rupiah($totalLiabilitas); ?></td>
-                        </tr>
-                        <tr class="section equity">
-                            <td colspan="2">EKUITAS</td>
-                        </tr>
-                        <tr class="indent">
-                            <td>Modal Disetor</td>
-                            <td><?php echo rupiah($modalAwal); ?></td>
-                        </tr>
-                        <tr class="indent">
-                            <td>Laba / Rugi Bersih</td>
-                            <td><?php echo rupiah($labaRugiPeriode); ?></td>
-                        </tr>
-                        <tr class="total">
-                            <td>TOTAL EKUITAS</td>
-                            <td><?php echo rupiah($totalEkuitas); ?></td>
-                        </tr>
-                        <tr class="grand-total">
-                            <td>TOTAL LIABILITAS DAN EKUITAS</td>
-                            <td><?php echo rupiah($totalLiabilitas + $totalEkuitas); ?></td>
-                        </tr>
-                    </tbody>
-                </table>
-            </section>
-        </div>
-    </div>
 
     <div class="month-selector-card">
         <div class="month-selector-copy">
@@ -2413,13 +2217,13 @@ require_once __DIR__ . '/../includes/header.php';
                 <label for="reportMonth">Pilih Bulan</label>
                 <select id="reportMonth" name="report_month" aria-label="Pilih bulan laporan">
                     <?php if (empty($reportMonthOptions)): ?>
-                            <option value="" selected>Tidak ada bulan</option>
+                        <option value="" selected>Tidak ada bulan</option>
                     <?php else: ?>
-                            <?php foreach ($reportMonthOptions as $monthOption): ?>
-                                    <option value="<?php echo h($monthOption); ?>" <?php echo $monthOption === $selectedReportMonth ? 'selected' : ''; ?>>
-                                        <?php echo h($bulanIndonesia[(int) date('n', strtotime($monthOption . '-01'))] . ' ' . date('Y', strtotime($monthOption . '-01'))); ?>
-                                    </option>
-                            <?php endforeach; ?>
+                        <?php foreach ($reportMonthOptions as $monthOption): ?>
+                            <option value="<?php echo h($monthOption); ?>" <?php echo $monthOption === $selectedReportMonth ? 'selected' : ''; ?>>
+                                <?php echo h($bulanIndonesia[(int) date('n', strtotime($monthOption . '-01'))] . ' ' . date('Y', strtotime($monthOption . '-01'))); ?>
+                            </option>
+                        <?php endforeach; ?>
                     <?php endif; ?>
                 </select>
             </div>
@@ -2587,6 +2391,350 @@ require_once __DIR__ . '/../includes/header.php';
         </div>
 
     </div>
+
+
+    <?php
+    /* DETAIL ARUS KAS UNTUK LAPORAN */
+    $akInflows = [];
+    foreach ($incomeDetailRows as $row) {
+        if ($row['sumber'] === 'PENJUALAN') {
+            if (!empty($row['penjualan_sparepart_status'])) {
+                $key = 'Penerimaan kas dari penjualan sparepart';
+            } else {
+                $key = 'Penerimaan kas dari penjualan excavator';
+            }
+        } else {
+            $kategori = $row['kategori_nama'] ?: 'Lainnya';
+            if (stripos($kategori, 'sewa') !== false) {
+                $key = 'Penerimaan kas dari pelanggan - sewa';
+            } else {
+                $key = 'Penerimaan kas dari ' . $kategori;
+            }
+        }
+        if (!isset($akInflows[$key]))
+            $akInflows[$key] = 0.0;
+        $akInflows[$key] += (float) $row['nominal'];
+    }
+
+    $akOutflowsOp = [];
+    $akOutflowsInv = [];
+    foreach ($expenseDetailRows as $row) {
+        if ($row['sumber'] === 'PEMBELIAN') {
+            if (!empty($row['pembelian_sparepart_id'])) {
+                $key = 'Pembelian Persediaan sparepart';
+                $akOutflowsOp[$key] = ($akOutflowsOp[$key] ?? 0) + (float) $row['nominal'];
+            } elseif (!empty($row['pembelian_restorasi_id'])) {
+                $key = 'Pembelian persediaan Breaker unit';
+                $akOutflowsOp[$key] = ($akOutflowsOp[$key] ?? 0) + (float) $row['nominal'];
+            } else {
+                $key = 'Pembelian excavator';
+                $akOutflowsInv[$key] = ($akOutflowsInv[$key] ?? 0) + (float) $row['nominal'];
+            }
+        } else {
+            $kategori = $row['kategori_nama'] ?: 'Lain-lain';
+            if (($row['kelompok_laporan'] ?? '') === 'MODAL_ASET') {
+                $key = 'Pembelian ' . $kategori;
+                $akOutflowsInv[$key] = ($akOutflowsInv[$key] ?? 0) + (float) $row['nominal'];
+            } else {
+                $key = 'Pembayaran ' . $kategori;
+                $akOutflowsOp[$key] = ($akOutflowsOp[$key] ?? 0) + (float) $row['nominal'];
+            }
+        }
+    }
+    ?>
+    <div class="statement-print">
+        <div class="statement-heading">Laporan Keuangan Utama</div>
+        <div class="statement-period">
+            Periode laporan: <?php echo h(date('d F Y', strtotime($tanggalAwal))); ?>
+            s.d. <?php echo h(date('d F Y', strtotime($tanggalAkhir))); ?>
+        </div>
+
+        <div class="statement-grid">
+            <section class="statement-card">
+                <div class="statement-title">Laporan Perubahan Modal<span>Asrindo</span><span>yang berakhir pada
+                        <?php echo h(date('d F Y', strtotime($tanggalAkhir))); ?></span><span>Disajikan dalam bentuk
+                        rupiah</span></div>
+                <table class="statement-table">
+                    <tbody>
+                        <tr class="indent">
+                            <td>Setoran Modal</td>
+                            <td><?php echo $modalAwal == 0 ? '-' : rupiah($modalAwal); ?></td>
+                        </tr>
+                        <tr class="indent">
+                            <td>Laba Bersih</td>
+                            <td><?php echo rupiah($labaRugiPeriode); ?></td>
+                        </tr>
+                        <tr class="indent">
+                            <td>Penghasilan Komprehensif Lainnya</td>
+                            <td>-</td>
+                        </tr>
+                        <tr class="grand-total">
+                            <td>Saldo Per <?php echo h(date('d F Y', strtotime($tanggalAkhir))); ?></td>
+                            <td><?php echo rupiah($modalAwal + $labaRugiPeriode); ?></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <section class="statement-card">
+                <div class="statement-title">Laporan Arus Kas<span>Asrindo</span><span>yang berakhir pada
+                        <?php echo h(date('d F Y', strtotime($tanggalAkhir))); ?></span><span>Disajikan dalam bentuk
+                        rupiah</span></div>
+                <table class="statement-table">
+                    <tbody>
+                        <tr class="section">
+                            <td colspan="2">Arus Kas dari Aktivitas Operasional</td>
+                        </tr>
+                        <?php
+                        $totalInflows = 0;
+                        if (empty($akInflows)) {
+                            echo '<tr class="indent"><td>Penerimaan Kas</td><td>-</td></tr>';
+                        } else {
+                            foreach ($akInflows as $label => $val) {
+                                $totalInflows += $val;
+                                echo '<tr class="indent"><td>' . h($label) . '</td><td>' . ($val == 0 ? '-' : rupiah($val)) . '</td></tr>';
+                            }
+                        }
+
+                        $totalOutflowsOp = 0;
+                        if (empty($akOutflowsOp)) {
+                            echo '<tr class="indent"><td>Pembayaran Operasional</td><td>-</td></tr>';
+                        } else {
+                            foreach ($akOutflowsOp as $label => $val) {
+                                $totalOutflowsOp += $val;
+                                echo '<tr class="indent"><td>' . h($label) . '</td><td>' . ($val == 0 ? '-' : '- ' . rupiah($val)) . '</td></tr>';
+                            }
+                        }
+                        $netOp = $totalInflows - $totalOutflowsOp;
+                        ?>
+                        <tr class="total">
+                            <td>Kas Bersih dari Aktivitas Operasional</td>
+                            <td><?php echo $netOp < 0 ? '- ' . rupiah(abs($netOp)) : rupiah($netOp); ?></td>
+                        </tr>
+                        <tr class="section">
+                            <td colspan="2">Arus Kas dari Aktivitas Investasi</td>
+                        </tr>
+                        <?php
+                        $totalOutflowsInv = 0;
+                        if (empty($akOutflowsInv)) {
+                            echo '<tr class="indent"><td>Pembelian Aset</td><td>-</td></tr>';
+                        } else {
+                            foreach ($akOutflowsInv as $label => $val) {
+                                $totalOutflowsInv += $val;
+                                echo '<tr class="indent"><td>' . h($label) . '</td><td>' . ($val == 0 ? '-' : '- ' . rupiah($val)) . '</td></tr>';
+                            }
+                        }
+                        $netInv = -$totalOutflowsInv;
+                        ?>
+                        <tr class="total">
+                            <td>Kas Bersih Aktivitas Investasi</td>
+                            <td><?php echo $netInv < 0 ? '- ' . rupiah(abs($netInv)) : rupiah($netInv); ?></td>
+                        </tr>
+                        <tr class="section">
+                            <td colspan="2">Arus Kas dari Aktivitas Pendanaan</td>
+                        </tr>
+                        <tr class="indent">
+                            <td>Penerimaan setoran modal</td>
+                            <td>-</td>
+                        </tr>
+                        <tr class="indent">
+                            <td>Prive</td>
+                            <td>-</td>
+                        </tr>
+                        <tr class="total">
+                            <td>Kas Bersih Aktivitas Pendanaan</td>
+                            <td>-</td>
+                        </tr>
+                        <tr class="grand-total">
+                            <td>Kas Akhir Periode</td>
+                            <td><?php echo rupiah($kasAkhirPeriode); ?></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <section class="statement-card">
+                <div class="statement-title">Laporan Posisi Keuangan<span>Asrindo</span><span>yang berakhir pada
+                        <?php echo h(date('d F Y', strtotime($tanggalAkhir))); ?></span><span>Disajikan dalam bentuk
+                        rupiah</span></div>
+                <div
+                    style="display: flex; flex-direction: row; align-items: stretch; width: 100%; flex: 1;">
+                    <div
+                        style="flex: 1; border-right: 1px solid #dce3eb; display: flex; flex-direction: column; justify-content: space-between;">
+                        <table class="statement-table" style="margin-bottom: auto;">
+                            <tbody>
+                                <tr class="section">
+                                    <td colspan="2">ASET LANCAR</td>
+                                </tr>
+                                <tr class="indent">
+                                    <td>Kas</td>
+                                    <td><?php echo rupiah($printCashEnd); ?></td>
+                                </tr>
+                                <?php if ($piutangPenjualan > 0): ?>
+                                    <tr class="indent">
+                                        <td>Piutang Penjualan</td>
+                                        <td><?php echo rupiah($piutangPenjualan); ?></td>
+                                    </tr>
+                                <?php endif; ?>
+                                <?php foreach ($positionUnitRows as $row): ?>
+                                    <tr class="indent">
+                                        <td><?php echo h($row['label']); ?></td>
+                                        <td><?php echo rupiah($row['nominal']); ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                                <?php if ($positionSparepartTotal > 0): ?>
+                                    <tr class="indent">
+                                        <td>Sparepart</td>
+                                        <td><?php echo rupiah($positionSparepartTotal); ?></td>
+                                    </tr>
+                                <?php endif; ?>
+                                <tr class="total">
+                                    <td>Total Aset Lancar</td>
+                                    <td><?php echo rupiah($printCashEnd + $piutangPenjualan + $persediaanTotal); ?></td>
+                                </tr>
+                                <tr class="section">
+                                    <td colspan="2">ASET TETAP</td>
+                                </tr>
+                                <tr class="indent">
+                                    <td>Aset Tetap</td>
+                                    <td><?php echo $asetTetap == 0 ? '-' : rupiah($asetTetap); ?></td>
+                                </tr>
+                                <tr class="total">
+                                    <td>Total Aset Tetap</td>
+                                    <td><?php echo $asetTetap == 0 ? '-' : rupiah($asetTetap); ?></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <table class="statement-table">
+                            <tbody>
+                                <tr class="grand-total">
+                                    <td>TOTAL ASET</td>
+                                    <td><?php echo rupiah($totalAset); ?></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div style="flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+                        <table class="statement-table" style="margin-bottom: auto;">
+                            <tbody>
+                                <tr class="section liability">
+                                    <td colspan="2">LIABILITAS</td>
+                                </tr>
+                                <tr class="indent">
+                                    <td>Utang Usaha</td>
+                                    <td><?php echo $totalLiabilitas == 0 ? '-' : rupiah($totalLiabilitas); ?></td>
+                                </tr>
+                                <tr class="total">
+                                    <td>TOTAL LIABILITAS</td>
+                                    <td><?php echo $totalLiabilitas == 0 ? '-' : rupiah($totalLiabilitas); ?></td>
+                                </tr>
+                                <tr class="section equity">
+                                    <td colspan="2">EKUITAS</td>
+                                </tr>
+                                <tr class="indent">
+                                    <td>Modal Disetor</td>
+                                    <td><?php echo rupiah($modalAwal); ?></td>
+                                </tr>
+                                <tr class="indent">
+                                    <td>Laba/Rugi Bersih</td>
+                                    <td><?php echo rupiah($labaRugiPeriode); ?></td>
+                                </tr>
+                                <tr class="total">
+                                    <td>TOTAL EKUITAS</td>
+                                    <td><?php echo rupiah($totalEkuitas); ?></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <table class="statement-table">
+                            <tbody>
+                                <tr class="grand-total">
+                                    <td>TOTAL LIABILITAS DAN EKUITAS</td>
+                                    <td><?php echo rupiah($totalLiabilitas + $totalEkuitas); ?></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <div class="laba-rugi-print-container">
+        <div class="statement-card" style="border: 1px solid #000;">
+            <div class="statement-title" style="border-bottom: 1px solid #000;">Laporan
+                Laba/Rugi<span>Asrindo</span><span>yang berakhir pada
+                    <?php echo h(date('d F Y', strtotime($tanggalAkhir))); ?></span><span>Disajikan dalam bentuk
+                    rupiah</span></div>
+            <table class="statement-table">
+                <tbody>
+                    <tr class="section">
+                        <td colspan="2">PENDAPATAN</td>
+                    </tr>
+                    <?php foreach ($profitIncomeRows as $row): ?>
+                        <tr class="indent">
+                            <td><?php echo h($row['label']); ?></td>
+                            <td><?php echo rupiah($row['nominal']); ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                    <tr class="total">
+                        <td>TOTAL PENDAPATAN</td>
+                        <td><?php echo rupiah($printIncomeTotal); ?></td>
+                    </tr>
+
+                    <tr class="section">
+                        <td colspan="2">BEBAN POKOK PENDAPATAN</td>
+                    </tr>
+                    <?php foreach ($profitCogsRows as $row): ?>
+                        <tr class="indent">
+                            <td><?php echo h($row['label']); ?></td>
+                            <td><?php echo rupiah($row['nominal']); ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                    <tr class="total">
+                        <td>TOTAL BEBAN POKOK PENDAPATAN</td>
+                        <td><?php echo rupiah($printCogsTotal); ?></td>
+                    </tr>
+
+                    <tr class="indent">
+                        <td>Beban Pajak</td>
+                        <td>-</td>
+                    </tr>
+                    <tr class="indent">
+                        <td>Beban Pembangunan</td>
+                        <td>-</td>
+                    </tr>
+
+                    <tr class="section">
+                        <td colspan="2">BEBAN OPERASIONAL</td>
+                    </tr>
+                    <?php foreach ($profitOperatingRows as $row): ?>
+                        <tr class="indent">
+                            <td><?php echo h($row['label']); ?></td>
+                            <td><?php echo rupiah($row['nominal']); ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                    <tr class="total">
+                        <td>TOTAL BEBAN OPERASIONAL</td>
+                        <td><?php echo rupiah($printOperatingTotal); ?></td>
+                    </tr>
+
+                    <tr class="grand-total" style="border-top: 1px solid transparent; background: transparent;">
+                        <td colspan="2">&nbsp;</td>
+                    </tr>
+
+                    <tr class="grand-total">
+                        <td>LABA / RUGI KOTOR</td>
+                        <td><?php echo rupiah($printIncomeTotal - $printCogsTotal); ?></td>
+                    </tr>
+                    <tr class="grand-total">
+                        <td>LABA / RUGI BERSIH</td>
+                        <td><?php echo rupiah($printNetTotal); ?></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
 
     <!-- =========================================================
          PENJUALAN & PEMBELIAN
@@ -2772,76 +2920,76 @@ require_once __DIR__ . '/../includes/header.php';
 
             <?php if (!$monthlyRows): ?>
 
-                    <div class="empty-report">
-                        Belum ada transaksi keuangan pada periode tersebut.
-                    </div>
+                <div class="empty-report">
+                    Belum ada transaksi keuangan pada periode tersebut.
+                </div>
 
             <?php else: ?>
 
-                    <?php
-                    $maxMonthly = 0.0;
+                <?php
+                $maxMonthly = 0.0;
 
-                    foreach ($monthlyRows as $monthly) {
-                        $maxMonthly = max(
-                            $maxMonthly,
-                            (float) $monthly['pemasukan_kas'],
-                            (float) $monthly['pengeluaran_kas']
-                        );
-                    }
-                    ?>
+                foreach ($monthlyRows as $monthly) {
+                    $maxMonthly = max(
+                        $maxMonthly,
+                        (float) $monthly['pemasukan_kas'],
+                        (float) $monthly['pengeluaran_kas']
+                    );
+                }
+                ?>
 
-                    <div class="chart-wrap">
+                <div class="chart-wrap">
 
-                        <?php foreach ($monthlyRows as $monthly): ?>
+                    <?php foreach ($monthlyRows as $monthly): ?>
 
-                                <?php
-                                $inValue = (float) $monthly['pemasukan_kas'];
-                                $outValue = (float) $monthly['pengeluaran_kas'];
+                        <?php
+                        $inValue = (float) $monthly['pemasukan_kas'];
+                        $outValue = (float) $monthly['pengeluaran_kas'];
 
-                                $inHeight = $maxMonthly > 0
-                                    ? ($inValue / $maxMonthly) * 165
-                                    : 2;
+                        $inHeight = $maxMonthly > 0
+                            ? ($inValue / $maxMonthly) * 165
+                            : 2;
 
-                                $outHeight = $maxMonthly > 0
-                                    ? ($outValue / $maxMonthly) * 165
-                                    : 2;
-                                ?>
+                        $outHeight = $maxMonthly > 0
+                            ? ($outValue / $maxMonthly) * 165
+                            : 2;
+                        ?>
 
-                                <div class="chart-column">
+                        <div class="chart-column">
 
-                                    <div class="chart-bars" title="<?php
-                                    echo h(
-                                        $monthly['periode'] .
-                                        ' | Masuk: ' . rupiah($inValue) .
-                                        ' | Keluar: ' . rupiah($outValue)
-                                    );
-                                    ?>">
-                                        <div class="chart-bar in" style="height:<?php echo max(2, $inHeight); ?>px"></div>
+                            <div class="chart-bars" title="<?php
+                            echo h(
+                                $monthly['periode'] .
+                                ' | Masuk: ' . rupiah($inValue) .
+                                ' | Keluar: ' . rupiah($outValue)
+                            );
+                            ?>">
+                                <div class="chart-bar in" style="height:<?php echo max(2, $inHeight); ?>px"></div>
 
-                                        <div class="chart-bar out" style="height:<?php echo max(2, $outHeight); ?>px"></div>
-                                    </div>
+                                <div class="chart-bar out" style="height:<?php echo max(2, $outHeight); ?>px"></div>
+                            </div>
 
-                                    <div class="chart-month">
-                                        <?php echo h($monthly['periode']); ?>
-                                    </div>
+                            <div class="chart-month">
+                                <?php echo h($monthly['periode']); ?>
+                            </div>
 
-                                </div>
-
-                        <?php endforeach; ?>
-
-                    </div>
-
-                    <div class="chart-legend">
-                        <div class="legend-item">
-                            <span class="legend-dot legend-in"></span>
-                            Pemasukan
                         </div>
 
-                        <div class="legend-item">
-                            <span class="legend-dot legend-out"></span>
-                            Pengeluaran
-                        </div>
+                    <?php endforeach; ?>
+
+                </div>
+
+                <div class="chart-legend">
+                    <div class="legend-item">
+                        <span class="legend-dot legend-in"></span>
+                        Pemasukan
                     </div>
+
+                    <div class="legend-item">
+                        <span class="legend-dot legend-out"></span>
+                        Pengeluaran
+                    </div>
+                </div>
 
             <?php endif; ?>
 
@@ -2859,67 +3007,80 @@ require_once __DIR__ . '/../includes/header.php';
                 client.</small>
         </div>
         <?php if (!$monthlyRows): ?>
-                <div class="empty-report">Belum ada bulan pada periode tersebut.</div>
+            <div class="empty-report">Belum ada bulan pada periode tersebut.</div>
         <?php else: ?>
-                <div class="monthly-table-wrap">
-                    <table class="report-table month-summary-table">
-                        <thead>
+            <div class="monthly-table-wrap">
+                <table class="report-table month-summary-table">
+                    <thead>
+                        <tr>
+                            <th>Bulan</th>
+                            <th class="right">Pendapatan Penjualan</th>
+                            <th class="right">Pendapatan Non Penjualan</th>
+                            <th class="right">Total Pendapatan</th>
+                            <th class="right">HPP</th>
+                            <th class="right">Laba Kotor</th>
+                            <th class="right">Pembayaran Pembelian</th>
+                            <th class="right">Modal Aset</th>
+                            <th class="right">Beban Operasional</th>
+                            <th class="right">Total Pengeluaran</th>
+                            <th class="right">Arus Kas Bersih</th>
+                            <th>Detail</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($monthlyRows as $monthly): ?>
+                            <?php
+                            $monthIncome = (float) $monthly['penjualan'] + (float) $monthly['non_penjualan'];
+                            $monthGrossProfit = $monthIncome - (float) $monthly['hpp'];
+                            $monthCashOut = (float) $monthly['pengeluaran_kas'];
+                            $monthCashNet = (float) $monthly['pemasukan_kas'] - $monthCashOut;
+                            ?>
                             <tr>
-                                <th>Bulan</th>
-                                <th class="right">Pendapatan Penjualan</th>
-                                <th class="right">Pendapatan Non Penjualan</th>
-                                <th class="right">Total Pendapatan</th>
-                                <th class="right">HPP</th>
-                                <th class="right">Laba Kotor</th>
-                                <th class="right">Pembayaran Pembelian</th>
-                                <th class="right">Modal Aset</th>
-                                <th class="right">Beban Operasional</th>
-                                <th class="right">Total Pengeluaran</th>
-                                <th class="right">Arus Kas Bersih</th>
-                                <th>Detail</th>
+                                <td><strong><?php echo h(date('F Y', strtotime($monthly['periode'] . '-01'))); ?></strong>
+                                    <div class="report-note" style="margin-top:2px"><?php echo h($monthly['periode']); ?></div>
+                                </td>
+                                <td class="money"><?php echo rupiah($monthly['penjualan']); ?></td>
+                                <td class="money"><?php echo rupiah($monthly['non_penjualan']); ?></td>
+                                <td class="money"><strong><?php echo rupiah($monthIncome); ?></strong></td>
+                                <td class="money"><?php echo rupiah($monthly['hpp']); ?></td>
+                                <td class="money"><strong><?php echo rupiah($monthGrossProfit); ?></strong></td>
+                                <td class="money"><?php echo rupiah($monthly['belanja_pembelian_kas']); ?></td>
+                                <td class="money"><?php echo rupiah($monthly['modal_aset']); ?></td>
+                                <td class="money"><?php echo rupiah($monthly['beban_operasional']); ?></td>
+                                <td class="money"><strong><?php echo rupiah($monthCashOut); ?></strong></td>
+                                <td
+                                    class="money <?php echo $monthCashNet >= 0 ? 'month-value-positive' : 'month-value-negative'; ?>">
+                                    <?php echo rupiah($monthCashNet); ?>
+                                </td>
+                                <td><button type="button" class="btn-detail-month"
+                                        onclick="showMonthlyReport('<?php echo h($monthly['periode']); ?>')">Detail</button>
+                                </td>
                             </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($monthlyRows as $monthly): ?>
-                                    <?php
-                                    $monthIncome = (float) $monthly['penjualan'] + (float) $monthly['non_penjualan'];
-                                    $monthGrossProfit = $monthIncome - (float) $monthly['hpp'];
-                                    $monthCashOut = (float) $monthly['pengeluaran_kas'];
-                                    $monthCashNet = (float) $monthly['pemasukan_kas'] - $monthCashOut;
-                                    ?>
-                                    <tr>
-                                        <td><strong><?php echo h(date('F Y', strtotime($monthly['periode'] . '-01'))); ?></strong>
-                                            <div class="report-note" style="margin-top:2px"><?php echo h($monthly['periode']); ?></div>
-                                        </td>
-                                        <td class="money"><?php echo rupiah($monthly['penjualan']); ?></td>
-                                        <td class="money"><?php echo rupiah($monthly['non_penjualan']); ?></td>
-                                        <td class="money"><strong><?php echo rupiah($monthIncome); ?></strong></td>
-                                        <td class="money"><?php echo rupiah($monthly['hpp']); ?></td>
-                                        <td class="money"><strong><?php echo rupiah($monthGrossProfit); ?></strong></td>
-                                        <td class="money"><?php echo rupiah($monthly['belanja_pembelian_kas']); ?></td>
-                                        <td class="money"><?php echo rupiah($monthly['modal_aset']); ?></td>
-                                        <td class="money"><?php echo rupiah($monthly['beban_operasional']); ?></td>
-                                        <td class="money"><strong><?php echo rupiah($monthCashOut); ?></strong></td>
-                                        <td
-                                            class="money <?php echo $monthCashNet >= 0 ? 'month-value-positive' : 'month-value-negative'; ?>">
-                                            <?php echo rupiah($monthCashNet); ?></td>
-                                        <td><button type="button" class="btn-detail-month"
-                                                onclick="showMonthlyReport('<?php echo h($monthly['periode']); ?>')">Detail</button>
-                                        </td>
-                                    </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
         <?php endif; ?>
     </div>
 
+    <div id="monthly-print-container" class="monthly-print-container"></div>
     <div class="month-modal-backdrop" id="monthlyReportModal">
         <div class="month-modal">
             <div class="month-modal-header">
                 <div class="month-modal-title">Laporan Keuangan Bulanan<small id="monthlyReportModalSubtitle">Format
                         laporan sesuai kebutuhan client</small></div>
-                <button type="button" class="month-modal-close" onclick="closeMonthlyReport()">×</button>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <button type="button" class="btn btn-primary" onclick="printMonthlyReport()"
+                        style="background-color: #2563eb; color: white; font-size: 13px; font-weight: 500; padding: 6px 12px; display: flex; align-items: center; gap: 6px; border: none; border-radius: 6px; cursor: pointer; font-family: inherit;">
+                        <svg style="width:16px;height:16px" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z">
+                            </path>
+                        </svg>
+                        Cetak PDF
+                    </button>
+                    <button type="button" class="month-modal-close" onclick="closeMonthlyReport()">×</button>
+                </div>
             </div>
             <div id="monthlyReportContent"></div>
         </div>
@@ -2936,110 +3097,110 @@ require_once __DIR__ . '/../includes/header.php';
 
         <?php if (empty($expenseCategories)): ?>
 
-                <div class="empty-report">
-                    Belum ada data pengeluaran pada periode tersebut.
-                </div>
+            <div class="empty-report">
+                Belum ada data pengeluaran pada periode tersebut.
+            </div>
 
         <?php else: ?>
 
-                <table class="report-table">
+            <table class="report-table">
 
-                    <thead>
+                <thead>
+                    <tr>
+                        <th>Kategori</th>
+                        <th>Kelompok</th>
+                        <th>Transaksi</th>
+                        <th class="right">Total</th>
+                        <th style="width:35%">Proporsi</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    <?php foreach ($expenseCategories as $category): ?>
+
+                        <?php
+                        $categoryTotal = (float) $category['total'];
+
+                        $percentage = $totalPengeluaran > 0
+                            ? ($categoryTotal / $totalPengeluaran) * 100
+                            : 0;
+                        ?>
+
                         <tr>
-                            <th>Kategori</th>
-                            <th>Kelompok</th>
-                            <th>Transaksi</th>
-                            <th class="right">Total</th>
-                            <th style="width:35%">Proporsi</th>
-                        </tr>
-                    </thead>
 
-                    <tbody>
+                            <td>
+                                <strong>
+                                    <?php echo h($category['kategori']); ?>
+                                </strong>
+                            </td>
 
-                        <?php foreach ($expenseCategories as $category): ?>
+                            <td>
+                                <span class="badge badge-group">
+                                    <?php
+                                    echo h(
+                                        str_replace(
+                                            '_',
+                                            ' ',
+                                            $category['kelompok']
+                                        )
+                                    );
+                                    ?>
+                                </span>
+                            </td>
 
-                                <?php
-                                $categoryTotal = (float) $category['total'];
+                            <td>
+                                <?php echo number_format(
+                                    (int) $category['jumlah'],
+                                    0,
+                                    ',',
+                                    '.'
+                                ); ?>
+                            </td>
 
-                                $percentage = $totalPengeluaran > 0
-                                    ? ($categoryTotal / $totalPengeluaran) * 100
-                                    : 0;
-                                ?>
+                            <td class="money">
+                                <?php echo rupiah($categoryTotal); ?>
+                            </td>
 
-                                <tr>
+                            <td>
 
-                                    <td>
-                                        <strong>
-                                            <?php echo h($category['kategori']); ?>
-                                        </strong>
-                                    </td>
+                                <div class="progress-row">
 
-                                    <td>
-                                        <span class="badge badge-group">
-                                            <?php
-                                            echo h(
-                                                str_replace(
-                                                    '_',
-                                                    ' ',
-                                                    $category['kelompok']
-                                                )
-                                            );
-                                            ?>
+                                    <div class="progress-label">
+
+                                        <span>
+                                            <?php echo number_format(
+                                                $percentage,
+                                                1,
+                                                ',',
+                                                '.'
+                                            ); ?>%
                                         </span>
-                                    </td>
 
-                                    <td>
-                                        <?php echo number_format(
-                                            (int) $category['jumlah'],
-                                            0,
-                                            ',',
-                                            '.'
-                                        ); ?>
-                                    </td>
+                                        <span>
+                                            <?php echo rupiah($categoryTotal); ?>
+                                        </span>
 
-                                    <td class="money">
-                                        <?php echo rupiah($categoryTotal); ?>
-                                    </td>
+                                    </div>
 
-                                    <td>
+                                    <div class="progress-track">
 
-                                        <div class="progress-row">
-
-                                            <div class="progress-label">
-
-                                                <span>
-                                                    <?php echo number_format(
-                                                        $percentage,
-                                                        1,
-                                                        ',',
-                                                        '.'
-                                                    ); ?>%
-                                                </span>
-
-                                                <span>
-                                                    <?php echo rupiah($categoryTotal); ?>
-                                                </span>
-
-                                            </div>
-
-                                            <div class="progress-track">
-
-                                                <div class="progress-fill" style="width:<?php echo min(100, max(0, $percentage)); ?>%">
-                                                </div>
-
-                                            </div>
-
+                                        <div class="progress-fill" style="width:<?php echo min(100, max(0, $percentage)); ?>%">
                                         </div>
 
-                                    </td>
+                                    </div>
 
-                                </tr>
+                                </div>
 
-                        <?php endforeach; ?>
+                            </td>
 
-                    </tbody>
+                        </tr>
 
-                </table>
+                    <?php endforeach; ?>
+
+                </tbody>
+
+            </table>
 
         <?php endif; ?>
 
@@ -3063,119 +3224,119 @@ require_once __DIR__ . '/../includes/header.php';
 
         <?php if (empty($cashRows)): ?>
 
-                <div class="empty-report">
-                    Belum ada transaksi kas pada periode tersebut.
-                </div>
+            <div class="empty-report">
+                Belum ada transaksi kas pada periode tersebut.
+            </div>
 
         <?php else: ?>
 
-                <div class="cash-table-wrap">
+            <div class="cash-table-wrap">
 
-                    <table class="report-table cash-table">
+                <table class="report-table cash-table">
 
-                        <thead>
+                    <thead>
+                        <tr>
+                            <th>Tanggal</th>
+                            <th>Nomor</th>
+                            <th>Tipe</th>
+                            <th>Sumber</th>
+                            <th>Kategori</th>
+                            <th>Jenis</th>
+                            <th class="right">Pemasukan</th>
+                            <th class="right">Pengeluaran</th>
+                            <th>Metode</th>
+                            <th>Referensi</th>
+                            <th>Keterangan</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+
+                        <?php foreach ($cashRows as $row): ?>
+
                             <tr>
-                                <th>Tanggal</th>
-                                <th>Nomor</th>
-                                <th>Tipe</th>
-                                <th>Sumber</th>
-                                <th>Kategori</th>
-                                <th>Jenis</th>
-                                <th class="right">Pemasukan</th>
-                                <th class="right">Pengeluaran</th>
-                                <th>Metode</th>
-                                <th>Referensi</th>
-                                <th>Keterangan</th>
+
+                                <td>
+                                    <?php echo h($row['tanggal']); ?>
+                                </td>
+
+                                <td>
+                                    <strong>
+                                        <?php echo h($row['nomor']); ?>
+                                    </strong>
+                                </td>
+
+                                <td>
+                                    <?php if ($row['tipe'] === 'PEMASUKAN'): ?>
+
+                                        <span class="badge badge-income">
+                                            PEMASUKAN
+                                        </span>
+
+                                    <?php else: ?>
+
+                                        <span class="badge badge-expense">
+                                            PENGELUARAN
+                                        </span>
+
+                                    <?php endif; ?>
+                                </td>
+
+                                <td>
+                                    <?php echo h(
+                                        str_replace(
+                                            '_',
+                                            ' ',
+                                            $row['sumber']
+                                        )
+                                    ); ?>
+                                </td>
+
+                                <td>
+                                    <?php echo h($row['kategori']); ?>
+                                </td>
+
+                                <td>
+                                    <?php echo h($row['jenis'] ?: '-'); ?>
+                                </td>
+
+                                <td class="money net-positive">
+                                    <?php
+                                    echo (float) $row['masuk'] > 0
+                                        ? rupiah($row['masuk'])
+                                        : '-';
+                                    ?>
+                                </td>
+
+                                <td class="money net-negative">
+                                    <?php
+                                    echo (float) $row['keluar'] > 0
+                                        ? rupiah($row['keluar'])
+                                        : '-';
+                                    ?>
+                                </td>
+
+                                <td>
+                                    <?php echo h($row['metode'] ?: '-'); ?>
+                                </td>
+
+                                <td>
+                                    <?php echo h($row['referensi'] ?: '-'); ?>
+                                </td>
+
+                                <td>
+                                    <?php echo h($row['keterangan'] ?: '-'); ?>
+                                </td>
+
                             </tr>
-                        </thead>
 
-                        <tbody>
+                        <?php endforeach; ?>
 
-                            <?php foreach ($cashRows as $row): ?>
+                    </tbody>
 
-                                    <tr>
+                </table>
 
-                                        <td>
-                                            <?php echo h($row['tanggal']); ?>
-                                        </td>
-
-                                        <td>
-                                            <strong>
-                                                <?php echo h($row['nomor']); ?>
-                                            </strong>
-                                        </td>
-
-                                        <td>
-                                            <?php if ($row['tipe'] === 'PEMASUKAN'): ?>
-
-                                                    <span class="badge badge-income">
-                                                        PEMASUKAN
-                                                    </span>
-
-                                            <?php else: ?>
-
-                                                    <span class="badge badge-expense">
-                                                        PENGELUARAN
-                                                    </span>
-
-                                            <?php endif; ?>
-                                        </td>
-
-                                        <td>
-                                            <?php echo h(
-                                                str_replace(
-                                                    '_',
-                                                    ' ',
-                                                    $row['sumber']
-                                                )
-                                            ); ?>
-                                        </td>
-
-                                        <td>
-                                            <?php echo h($row['kategori']); ?>
-                                        </td>
-
-                                        <td>
-                                            <?php echo h($row['jenis'] ?: '-'); ?>
-                                        </td>
-
-                                        <td class="money net-positive">
-                                            <?php
-                                            echo (float) $row['masuk'] > 0
-                                                ? rupiah($row['masuk'])
-                                                : '-';
-                                            ?>
-                                        </td>
-
-                                        <td class="money net-negative">
-                                            <?php
-                                            echo (float) $row['keluar'] > 0
-                                                ? rupiah($row['keluar'])
-                                                : '-';
-                                            ?>
-                                        </td>
-
-                                        <td>
-                                            <?php echo h($row['metode'] ?: '-'); ?>
-                                        </td>
-
-                                        <td>
-                                            <?php echo h($row['referensi'] ?: '-'); ?>
-                                        </td>
-
-                                        <td>
-                                            <?php echo h($row['keterangan'] ?: '-'); ?>
-                                        </td>
-
-                                    </tr>
-
-                            <?php endforeach; ?>
-
-                        </tbody>
-
-                    </table>
-
-                </div>
+            </div>
 
         <?php endif; ?>
 
@@ -3206,36 +3367,146 @@ require_once __DIR__ . '/../includes/header.php';
         const selected = period || (selector ? selector.value : '');
         const data = monthlyReportData[selected];
         if (!data) { alert('Data laporan bulan tersebut tidak tersedia.'); return; }
-        const sales = (data.pendapatan_penjualan || []).reduce((s, r) => s + Number(r.nominal || 0), 0);
-        const nonSales = (data.pendapatan_non_penjualan || []).reduce((s, r) => s + Number(r.nominal || 0), 0);
-        const hpp = (data.hpp || []).reduce((s, r) => s + Number(r.nominal || 0), 0);
-        const purchases = (data.belanja_pembelian_kas || []).reduce((s, r) => s + Number(r.nominal || 0), 0);
-        const assets = (data.modal_aset || []).reduce((s, r) => s + Number(r.nominal || 0), 0);
-        const ops = (data.beban_operasional || []).reduce((s, r) => s + Number(r.nominal || 0), 0);
-        const other = (data.pengeluaran_lainnya || []).reduce((s, r) => s + Number(r.nominal || 0), 0);
-        const income = sales + nonSales;
+
+        const salesRows = data.pendapatan_penjualan || [];
+        const nonSalesRows = data.pendapatan_non_penjualan || [];
+        const income = salesRows.reduce((s, r) => s + Number(r.nominal || 0), 0) + nonSalesRows.reduce((s, r) => s + Number(r.nominal || 0), 0);
+
+        const hppRows = data.hpp || [];
+        const hpp = hppRows.reduce((s, r) => s + Number(r.nominal || 0), 0);
+
         const gross = income - hpp;
-        const cashOut = purchases + assets + ops + other;
-        const cashIn = Number(data.pemasukan_kas || 0);
-        const cashNet = cashIn - cashOut;
+
+        const opsRows = data.beban_operasional || [];
+        const otherRows = data.pengeluaran_lainnya || [];
+        const allOps = opsRows.concat(otherRows);
+        const ops = allOps.reduce((s, r) => s + Number(r.nominal || 0), 0);
+
+        const net = gross - ops;
+
         let html = '<div class="client-report">' +
-            '<div class="client-report-title"><strong>PT. ASRINDO GLOBAL MANDIRI</strong><span>LAPORAN KEUANGAN BULANAN</span><span>' + escapeReportText(monthTitle(selected)) + '</span></div>' +
-            '<div class="client-report-section"><div class="client-report-section-title">Laba Rugi</div>' +
-            reportRowsHtml(data.pendapatan_penjualan, 'Tidak ada pendapatan penjualan pada bulan ini.') +
-            reportRowsHtml(data.pendapatan_non_penjualan, 'Tidak ada pendapatan non penjualan pada bulan ini.') +
-            '<table class="client-report-table"><tbody><tr class="subtotal"><td>Total Pendapatan</td><td class="money">' + formatReportMoney(income) + '</td></tr></tbody></table>' +
-            sectionHtml('HPP Barang Terjual', data.hpp, 'Tidak ada HPP pada bulan ini.') +
-            '<table class="client-report-table"><tbody><tr class="subtotal"><td>LABA KOTOR</td><td class="money">' + formatReportMoney(gross) + '</td></tr></tbody></table>' +
-            sectionHtml('Beban Operasional', data.beban_operasional, 'Tidak ada beban operasional pada bulan ini.') +
-            (other > 0 ? sectionHtml('Pengeluaran Lainnya', data.pengeluaran_lainnya, 'Tidak ada pengeluaran lainnya pada bulan ini.') : '') +
-            '<table class="client-report-table"><tbody><tr class="grand-total"><td>LABA / RUGI BERSIH</td><td class="money ' + (gross - ops - other >= 0 ? 'month-value-positive' : 'month-value-negative') + '">' + formatReportMoney(gross - ops - other) + '</td></tr></tbody></table></div>' +
-            '<div class="client-report-section"><div class="client-report-section-title">Arus Kas</div>' +
-            '<table class="client-report-table"><tbody><tr><td class="indent">Kas Masuk Aktual</td><td class="money">' + formatReportMoney(cashIn) + '</td></tr><tr><td class="indent">Pembayaran Pembelian Alat Berat & Sparepart</td><td class="money">' + formatReportMoney(purchases) + '</td></tr><tr><td class="indent">Belanja Modal Aset</td><td class="money">' + formatReportMoney(assets) + '</td></tr><tr><td class="indent">Beban Operasional & Lainnya</td><td class="money">' + formatReportMoney(ops + other) + '</td></tr><tr class="grand-total"><td>ARUS KAS BERSIH</td><td class="money ' + (cashNet >= 0 ? 'month-value-positive' : 'month-value-negative') + '">' + formatReportMoney(cashNet) + '</td></tr></tbody></table></div>' +
-            '<div class="client-report-note">Pembelian yang belum terjual tidak dibebankan sebagai HPP. Pembayaran pembelian tetap mengurangi kas pada saat benar-benar dibayar. HPP hanya berasal dari detail penjualan yang memiliki nilai HPP.</div></div>';
+            '<div class="client-report-title"><strong>Laporan Laba/Rugi</strong><span>Asrindo</span><span>yang berakhir pada ' + escapeReportText(monthTitle(selected)) + '</span></div>' +
+            '<div class="client-report-section"><div class="client-report-section-title">PENDAPATAN</div>';
+
+        let salesHtml = salesRows.map(r => {
+            let label = r.label.replace('Penjualan Alat Berat ', '');
+            return '<tr><td class="indent"><strong>' + escapeReportText(label) + '</strong></td><td class="money">' + formatReportMoney(r.nominal) + '</td></tr>';
+        }).join('');
+        let nonSalesHtml = nonSalesRows.map(r => '<tr><td class="indent"><strong>' + escapeReportText(r.label) + '</strong></td><td class="money">' + formatReportMoney(r.nominal) + '</td></tr>').join('');
+
+        html += '<table class="client-report-table"><tbody>' + salesHtml + nonSalesHtml + '</tbody></table>';
+        html += '<table class="client-report-table"><tbody><tr class="subtotal"><td>TOTAL PENDAPATAN</td><td class="money">' + formatReportMoney(income) + '</td></tr></tbody></table></div>';
+
+        html += '<div class="client-report-section"><div class="client-report-section-title">BEBAN POKOK PENDAPATAN</div>';
+
+        let hppHtml = '';
+        let hasUnits = hppRows.some(r => r.label.includes('HPP Alat Berat'));
+        if (hasUnits) {
+            hppHtml += '<tr><td class="indent" colspan="2" style="font-weight: normal; font-size: 11px;">Pembelian Unit Excavator</td></tr>';
+        }
+        hppHtml += hppRows.map(r => {
+            let label = r.label.replace('HPP Alat Berat ', '');
+            return '<tr><td class="indent" style="padding-left: 20px;"><strong>' + escapeReportText(label) + '</strong></td><td class="money">' + formatReportMoney(r.nominal) + '</td></tr>';
+        }).join('');
+
+        html += '<table class="client-report-table"><tbody>' + hppHtml + '</tbody></table>';
+        html += '<table class="client-report-table"><tbody><tr class="subtotal"><td>TOTAL BEBAN POKOK PENDAPATAN</td><td class="money">' + formatReportMoney(hpp) + '</td></tr></tbody></table></div>';
+
+        html += '<div class="client-report-section">' +
+            '<table class="client-report-table"><tbody>' +
+            '<tr><td class="indent"><strong>Beban Pajak</strong></td><td class="money">-</td></tr>' +
+            '<tr><td class="indent"><strong>Beban Pembangunan</strong></td><td class="money">-</td></tr>' +
+            '</tbody></table></div>';
+
+        html += '<div class="client-report-section"><div class="client-report-section-title">BEBAN OPERASIONAL</div>';
+        let opsHtml = allOps.map(r => '<tr><td class="indent"><strong>' + escapeReportText(r.label) + '</strong></td><td class="money">' + formatReportMoney(r.nominal) + '</td></tr>').join('');
+        html += '<table class="client-report-table"><tbody>' + opsHtml + '</tbody></table>';
+
+        html += '<table class="client-report-table"><tbody>' +
+            '<tr class="subtotal"><td>TOTAL BEBAN OPERASIONAL</td><td class="money">' + formatReportMoney(ops) + '</td></tr>' +
+            '<tr class="grand-total"><td style="border-top: none;">&nbsp;</td><td style="border-top: none;">&nbsp;</td></tr>' +
+            '<tr class="grand-total"><td>LABA/RUGI KOTOR</td><td class="money">' + formatReportMoney(gross) + '</td></tr>' +
+            '<tr class="grand-total"><td>LABA/RUGI BERSIH</td><td class="money ' + (net >= 0 ? 'month-value-positive' : 'month-value-negative') + '">' + formatReportMoney(net) + '</td></tr>' +
+            '</tbody></table></div>';
+
+        html += '<div class="client-report-note">HPP hanya berasal dari detail penjualan yang memiliki nilai HPP. Pengeluaran pembelian alat berat tidak dibebankan sebagai HPP hingga terjual.</div></div>';
+
         document.getElementById('monthlyReportContent').innerHTML = html;
         document.getElementById('monthlyReportModalSubtitle').textContent = 'Laporan bulan ' + monthTitle(selected);
         document.getElementById('monthlyReportModal').classList.add('show');
     }
+
+    function printMonthlyReport() {
+        const selector = document.getElementById('reportMonth');
+        const selected = selector ? selector.value : '';
+        const data = monthlyReportData[selected];
+        if (!data) { alert('Data laporan bulan tersebut tidak tersedia.'); return; }
+
+        const salesRows = data.pendapatan_penjualan || [];
+        const nonSalesRows = data.pendapatan_non_penjualan || [];
+        const income = salesRows.reduce((s, r) => s + Number(r.nominal || 0), 0) + nonSalesRows.reduce((s, r) => s + Number(r.nominal || 0), 0);
+
+        const hppRows = data.hpp || [];
+        const hpp = hppRows.reduce((s, r) => s + Number(r.nominal || 0), 0);
+
+        const gross = income - hpp;
+
+        const opsRows = data.beban_operasional || [];
+        const otherRows = data.pengeluaran_lainnya || [];
+        const allOps = opsRows.concat(otherRows);
+        const ops = allOps.reduce((s, r) => s + Number(r.nominal || 0), 0);
+
+        const net = gross - ops;
+
+        let html = '<div class="statement-card" style="border: 1px solid #000;">' +
+            '<div class="statement-title" style="border-bottom: 1px solid #000; font-size: 13px; text-transform: uppercase; margin-bottom: 10px;">Laporan Laba/Rugi<span style="text-transform: none; display: block; font-weight: normal; margin-top: 2px;">Asrindo</span><span style="text-transform: none; display: block; font-weight: normal;">yang berakhir pada ' + escapeReportText(monthTitle(selected)) + '</span><span style="text-transform: none; display: block; font-weight: normal;">Disajikan dalam bentuk rupiah</span></div>' +
+            '<table class="statement-table"><tbody>' +
+            '<tr class="section"><td colspan="2">PENDAPATAN</td></tr>';
+
+        salesRows.forEach(r => {
+            let label = r.label.replace('Penjualan Alat Berat ', '');
+            html += '<tr class="indent"><td>' + escapeReportText(label) + '</td><td>' + formatReportMoney(r.nominal) + '</td></tr>';
+        });
+        nonSalesRows.forEach(r => {
+            html += '<tr class="indent"><td>' + escapeReportText(r.label) + '</td><td>' + formatReportMoney(r.nominal) + '</td></tr>';
+        });
+
+        html += '<tr class="total"><td>TOTAL PENDAPATAN</td><td>' + formatReportMoney(income) + '</td></tr>' +
+            '<tr class="section"><td colspan="2">BEBAN POKOK PENDAPATAN</td></tr>';
+
+        let hasUnits = hppRows.some(r => r.label.includes('HPP Alat Berat'));
+        if (hasUnits) {
+            html += '<tr><td colspan="2" style="padding: 5px 7px; font-size: 10px;">Pembelian Unit Excavator</td></tr>';
+        }
+
+        hppRows.forEach(r => {
+            let label = r.label.replace('HPP Alat Berat ', '');
+            html += '<tr class="indent"><td>' + escapeReportText(label) + '</td><td>' + formatReportMoney(r.nominal) + '</td></tr>';
+        });
+
+        html += '<tr class="total"><td>TOTAL BEBAN POKOK PENDAPATAN</td><td>' + formatReportMoney(hpp) + '</td></tr>' +
+            '<tr class="indent"><td>Beban Pajak</td><td>-</td></tr>' +
+            '<tr class="indent"><td>Beban Pembangunan</td><td>-</td></tr>' +
+            '<tr class="section"><td colspan="2">BEBAN OPERASIONAL</td></tr>';
+
+        allOps.forEach(r => {
+            html += '<tr class="indent"><td>' + escapeReportText(r.label) + '</td><td>' + formatReportMoney(r.nominal) + '</td></tr>';
+        });
+
+        html += '<tr class="total"><td>TOTAL BEBAN OPERASIONAL</td><td>' + formatReportMoney(ops) + '</td></tr>' +
+            '<tr class="grand-total" style="border-top: 1px solid transparent; background: transparent;"><td colspan="2">&nbsp;</td></tr>' +
+            '<tr class="grand-total"><td>LABA/RUGI KOTOR</td><td>' + formatReportMoney(gross) + '</td></tr>' +
+            '<tr class="grand-total"><td>LABA/RUGI BERSIH</td><td>' + formatReportMoney(net) + '</td></tr>' +
+            '</tbody></table></div>';
+
+        document.getElementById('monthly-print-container').innerHTML = html;
+        document.body.classList.add('printing-monthly');
+        window.print();
+        setTimeout(() => {
+            document.body.classList.remove('printing-monthly');
+        }, 500);
+    }
+
     function closeMonthlyReport() {
         document.getElementById('monthlyReportModal').classList.remove('show');
     }
