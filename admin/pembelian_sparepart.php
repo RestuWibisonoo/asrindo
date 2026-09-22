@@ -16,12 +16,12 @@ $pageTitle = 'Pembelian Sparepart';
 
 function h($value): string
 {
-    return htmlspecialchars((string)($value ?? ''), ENT_QUOTES, 'UTF-8');
+    return htmlspecialchars((string) ($value ?? ''), ENT_QUOTES, 'UTF-8');
 }
 
 function rupiah($value): string
 {
-    return number_format((float)($value ?? 0), 0, ',', '.');
+    return number_format((float) ($value ?? 0), 0, ',', '.');
 }
 
 function redirectMessage(string $type, string $message, ?int $openPurchaseId = null): void
@@ -95,7 +95,7 @@ function stockDelta(PDO $pdo, int $sparepartId, float $delta): void
         throw new RuntimeException('Sparepart tidak ditemukan saat memperbarui stok.');
     }
 
-    $currentStock = (float)$row['stok'];
+    $currentStock = (float) $row['stok'];
     $newStock = $currentStock + $delta;
 
     if ($newStock < 0) {
@@ -151,8 +151,8 @@ function syncPurchaseExpense(PDO $pdo, int $purchaseId): void
     $stmt->execute([$purchaseId]);
     $expense = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if (strtoupper((string)$purchase['status']) === 'SELESAI') {
-        $nominal = (float)$purchase['total'];
+    if (strtoupper((string) $purchase['status']) === 'SELESAI') {
+        $nominal = (float) $purchase['total'];
 
         if ($nominal <= 0) {
             throw new RuntimeException(
@@ -173,12 +173,12 @@ function syncPurchaseExpense(PDO $pdo, int $purchaseId): void
                 $purchase['tanggal'],
                 $nominal,
                 'Pembayaran pembelian sparepart ' . $purchase['nomor_pembelian'],
-                (int)$expense['id']
+                (int) $expense['id']
             ]);
         } else {
             $nomorPengeluaran = 'PK-SP-' .
-                date('Ymd', strtotime((string)$purchase['tanggal'])) . '-' .
-                str_pad((string)$purchaseId, 8, '0', STR_PAD_LEFT);
+                date('Ymd', strtotime((string) $purchase['tanggal'])) . '-' .
+                str_pad((string) $purchaseId, 8, '0', STR_PAD_LEFT);
 
             // Kategori PEMBELIAN bersifat opsional. Jika tersedia, gunakan.
             $stmt = $pdo->prepare("
@@ -190,7 +190,7 @@ function syncPurchaseExpense(PDO $pdo, int $purchaseId): void
             ");
             $stmt->execute();
             $kategoriId = $stmt->fetchColumn();
-            $kategoriId = $kategoriId !== false ? (int)$kategoriId : null;
+            $kategoriId = $kategoriId !== false ? (int) $kategoriId : null;
 
             $stmt = $pdo->prepare("
                 INSERT INTO pengeluaran
@@ -220,7 +220,7 @@ function syncPurchaseExpense(PDO $pdo, int $purchaseId): void
                 $nominal,
                 $purchase['nomor_pembelian'],
                 'Pembayaran pembelian sparepart ' . $purchase['nomor_pembelian'],
-                isset($_SESSION['admin_id']) ? (int)$_SESSION['admin_id'] : null
+                isset($_SESSION['admin_id']) ? (int) $_SESSION['admin_id'] : null
             ]);
         }
 
@@ -235,7 +235,7 @@ function syncPurchaseExpense(PDO $pdo, int $purchaseId): void
             WHERE id = ?
             LIMIT 1
         ");
-        $stmt->execute([(int)$expense['id']]);
+        $stmt->execute([(int) $expense['id']]);
     }
 }
 
@@ -250,7 +250,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'detail') {
             throw new RuntimeException('ID pembelian tidak valid.');
         }
 
-        $purchase = getPurchase($pdo, (int)$id);
+        $purchase = getPurchase($pdo, (int) $id);
 
         if (!$purchase) {
             throw new RuntimeException('Data pembelian tidak ditemukan.');
@@ -276,12 +276,12 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'detail') {
             WHERE d.pembelian_id = ?
             ORDER BY d.id ASC
         ");
-        $stmt->execute([(int)$id]);
+        $stmt->execute([(int) $id]);
         $details = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         $subtotal = 0;
         foreach ($details as $detail) {
-            $subtotal += (float)$detail['subtotal'];
+            $subtotal += (float) $detail['subtotal'];
         }
 
         echo json_encode([
@@ -316,8 +316,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         |--------------------------------------------------------------
         */
         if ($action === 'create') {
-            $nomor = trim((string)($_POST['nomor_pembelian'] ?? ''));
-            $tanggal = trim((string)($_POST['tanggal'] ?? ''));
+            $nomor = trim((string) ($_POST['nomor_pembelian'] ?? ''));
+            $tanggal = trim((string) ($_POST['tanggal'] ?? ''));
             $supplierId = filter_var(
                 $_POST['supplier_id'] ?? null,
                 FILTER_VALIDATE_INT
@@ -327,10 +327,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 FILTER_VALIDATE_INT
             );
 
-            $qty = (float)($_POST['qty'] ?? 0);
-            $harga = (float)($_POST['harga'] ?? 0);
-            $diskon = (float)($_POST['diskon'] ?? 0);
-            $keterangan = trim((string)($_POST['keterangan'] ?? ''));
+            $qty = (float) ($_POST['qty'] ?? 0);
+            $harga = (float) ($_POST['harga'] ?? 0);
+            $diskon = (float) ($_POST['diskon'] ?? 0);
+            $keterangan = trim((string) ($_POST['keterangan'] ?? ''));
 
             if ($nomor === '' || $tanggal === '' || !$supplierId || !$sparepartId) {
                 redirectMessage(
@@ -391,15 +391,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $purchase = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if ($purchase) {
-                $purchaseId = (int)$purchase['id'];
+                $purchaseId = (int) $purchase['id'];
 
-                if ((int)$purchase['supplier_id'] !== (int)$supplierId) {
+                if ((int) $purchase['supplier_id'] !== (int) $supplierId) {
                     throw new RuntimeException(
                         'Nomor pembelian tersebut sudah digunakan oleh supplier lain.'
                     );
                 }
 
-                if (strtoupper((string)$purchase['status']) === 'BATAL') {
+                if (strtoupper((string) $purchase['status']) === 'BATAL') {
                     throw new RuntimeException(
                         'Pembelian berstatus BATAL tidak dapat ditambahkan.'
                     );
@@ -426,7 +426,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $keterangan !== '' ? $keterangan : null
                 ]);
 
-                $purchaseId = (int)$pdo->lastInsertId();
+                $purchaseId = (int) $pdo->lastInsertId();
             }
 
             $subtotal = ($qty * $harga) - $diskon;
@@ -471,14 +471,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         */
         if ($action === 'update_header') {
             $id = filter_var($_POST['id'] ?? null, FILTER_VALIDATE_INT);
-            $nomor = trim((string)($_POST['nomor_pembelian'] ?? ''));
-            $tanggal = trim((string)($_POST['tanggal'] ?? ''));
+            $nomor = trim((string) ($_POST['nomor_pembelian'] ?? ''));
+            $tanggal = trim((string) ($_POST['tanggal'] ?? ''));
             $supplierId = filter_var(
                 $_POST['supplier_id'] ?? null,
                 FILTER_VALIDATE_INT
             );
-            $status = strtoupper(trim((string)($_POST['status'] ?? 'DRAFT')));
-            $keterangan = trim((string)($_POST['keterangan'] ?? ''));
+            $status = strtoupper(trim((string) ($_POST['status'] ?? 'DRAFT')));
+            $keterangan = trim((string) ($_POST['keterangan'] ?? ''));
 
             $allowedStatus = ['DRAFT', 'PROSES', 'SELESAI', 'BATAL'];
 
@@ -490,7 +490,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 redirectMessage('error', 'Status pembelian tidak valid.');
             }
 
-            $purchase = getPurchase($pdo, (int)$id);
+            $purchase = getPurchase($pdo, (int) $id);
 
             if (!$purchase) {
                 redirectMessage('error', 'Pembelian tidak ditemukan.');
@@ -523,7 +523,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $pdo->beginTransaction();
 
-            $oldStatus = strtoupper((string)$purchase['status']);
+            $oldStatus = strtoupper((string) $purchase['status']);
 
             /*
             | Stok bertambah ketika status menjadi SELESAI.
@@ -535,13 +535,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     FROM pembelian_sparepart_detail
                     WHERE pembelian_id = ?
                 ");
-                $stmt->execute([(int)$id]);
+                $stmt->execute([(int) $id]);
 
                 foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $detail) {
                     stockDelta(
                         $pdo,
-                        (int)$detail['sparepart_id'],
-                        (float)$detail['qty']
+                        (int) $detail['sparepart_id'],
+                        (float) $detail['qty']
                     );
                 }
             } elseif ($oldStatus === 'SELESAI' && $status !== 'SELESAI') {
@@ -550,13 +550,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     FROM pembelian_sparepart_detail
                     WHERE pembelian_id = ?
                 ");
-                $stmt->execute([(int)$id]);
+                $stmt->execute([(int) $id]);
 
                 foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $detail) {
                     stockDelta(
                         $pdo,
-                        (int)$detail['sparepart_id'],
-                        -(float)$detail['qty']
+                        (int) $detail['sparepart_id'],
+                        -(float) $detail['qty']
                     );
                 }
             }
@@ -581,7 +581,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $id
             ]);
 
-            syncPurchaseExpense($pdo, (int)$id);
+            syncPurchaseExpense($pdo, (int) $id);
 
             $pdo->commit();
 
@@ -602,10 +602,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_POST['sparepart_id'] ?? null,
                 FILTER_VALIDATE_INT
             );
-            $qty = (float)($_POST['qty'] ?? 0);
-            $harga = (float)($_POST['harga'] ?? 0);
-            $diskon = (float)($_POST['diskon'] ?? 0);
-            $keterangan = trim((string)($_POST['keterangan'] ?? ''));
+            $qty = (float) ($_POST['qty'] ?? 0);
+            $harga = (float) ($_POST['harga'] ?? 0);
+            $diskon = (float) ($_POST['diskon'] ?? 0);
+            $keterangan = trim((string) ($_POST['keterangan'] ?? ''));
 
             if (!$purchaseId || !$sparepartId || $qty <= 0 || $harga < 0 || $diskon < 0) {
                 redirectMessage('error', 'Data detail pembelian tidak valid.');
@@ -615,13 +615,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 redirectMessage('error', 'Diskon tidak boleh lebih besar dari nilai barang.');
             }
 
-            $purchase = getPurchase($pdo, (int)$purchaseId);
+            $purchase = getPurchase($pdo, (int) $purchaseId);
 
             if (!$purchase) {
                 redirectMessage('error', 'Pembelian tidak ditemukan.');
             }
 
-            if (strtoupper((string)$purchase['status']) === 'BATAL') {
+            if (strtoupper((string) $purchase['status']) === 'BATAL') {
                 redirectMessage('error', 'Pembelian BATAL tidak dapat ditambah.');
             }
 
@@ -669,7 +669,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             /*
             | Jika nota sudah SELESAI, detail baru langsung masuk stok.
             */
-            if (strtoupper((string)$purchase['status']) === 'SELESAI') {
+            if (strtoupper((string) $purchase['status']) === 'SELESAI') {
                 stockDelta($pdo, $sparepartId, $qty);
             }
 
@@ -683,7 +683,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirectMessage(
                 'success',
                 'Detail sparepart berhasil ditambahkan.',
-                (int)$purchaseId
+                (int) $purchaseId
             );
         }
 
@@ -701,10 +701,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_POST['sparepart_id'] ?? null,
                 FILTER_VALIDATE_INT
             );
-            $qty = (float)($_POST['qty'] ?? 0);
-            $harga = (float)($_POST['harga'] ?? 0);
-            $diskon = (float)($_POST['diskon'] ?? 0);
-            $keterangan = trim((string)($_POST['keterangan'] ?? ''));
+            $qty = (float) ($_POST['qty'] ?? 0);
+            $harga = (float) ($_POST['harga'] ?? 0);
+            $diskon = (float) ($_POST['diskon'] ?? 0);
+            $keterangan = trim((string) ($_POST['keterangan'] ?? ''));
 
             if (!$detailId || !$sparepartId || $qty <= 0 || $harga < 0 || $diskon < 0) {
                 redirectMessage('error', 'Data detail tidak valid.');
@@ -749,11 +749,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             | Bila nota SELESAI, koreksi stok:
             | keluarkan qty lama, masukkan qty baru.
             */
-            if (strtoupper((string)$old['status']) === 'SELESAI') {
+            if (strtoupper((string) $old['status']) === 'SELESAI') {
                 stockDelta(
                     $pdo,
-                    (int)$old['sparepart_id'],
-                    -(float)$old['qty']
+                    (int) $old['sparepart_id'],
+                    -(float) $old['qty']
                 );
 
                 stockDelta(
@@ -787,8 +787,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $detailId
             ]);
 
-            refreshPurchaseTotal($pdo, (int)$old['pembelian_id']);
-            syncPurchaseExpense($pdo, (int)$old['pembelian_id']);
+            refreshPurchaseTotal($pdo, (int) $old['pembelian_id']);
+            syncPurchaseExpense($pdo, (int) $old['pembelian_id']);
 
             $pdo->commit();
 
@@ -832,11 +832,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $pdo->beginTransaction();
 
-            if (strtoupper((string)$detail['status']) === 'SELESAI') {
+            if (strtoupper((string) $detail['status']) === 'SELESAI') {
                 stockDelta(
                     $pdo,
-                    (int)$detail['sparepart_id'],
-                    -(float)$detail['qty']
+                    (int) $detail['sparepart_id'],
+                    -(float) $detail['qty']
                 );
             }
 
@@ -847,8 +847,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ");
             $stmt->execute([$detailId]);
 
-            refreshPurchaseTotal($pdo, (int)$detail['pembelian_id']);
-            syncPurchaseExpense($pdo, (int)$detail['pembelian_id']);
+            refreshPurchaseTotal($pdo, (int) $detail['pembelian_id']);
+            syncPurchaseExpense($pdo, (int) $detail['pembelian_id']);
 
             $pdo->commit();
 
@@ -867,7 +867,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 redirectMessage('error', 'ID pembelian tidak valid.');
             }
 
-            $purchase = getPurchase($pdo, (int)$id);
+            $purchase = getPurchase($pdo, (int) $id);
 
             if (!$purchase) {
                 redirectMessage('error', 'Pembelian tidak ditemukan.');
@@ -875,19 +875,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $pdo->beginTransaction();
 
-            if (strtoupper((string)$purchase['status']) === 'SELESAI') {
+            if (strtoupper((string) $purchase['status']) === 'SELESAI') {
                 $stmt = $pdo->prepare("
                     SELECT sparepart_id, qty
                     FROM pembelian_sparepart_detail
                     WHERE pembelian_id = ?
                 ");
-                $stmt->execute([(int)$id]);
+                $stmt->execute([(int) $id]);
 
                 foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $detail) {
                     stockDelta(
                         $pdo,
-                        (int)$detail['sparepart_id'],
-                        -(float)$detail['qty']
+                        (int) $detail['sparepart_id'],
+                        -(float) $detail['qty']
                     );
                 }
             }
@@ -981,8 +981,8 @@ $rows = $pdo->query("
     ORDER BY p.tanggal DESC, p.id DESC
 ")->fetchAll(PDO::FETCH_ASSOC);
 
-$msg = trim((string)($_GET['msg'] ?? ''));
-$msgType = trim((string)($_GET['msg_type'] ?? ''));
+$msg = trim((string) ($_GET['msg'] ?? ''));
+$msgType = trim((string) ($_GET['msg_type'] ?? ''));
 
 $extraHead = <<<'HTML'
 <style>
@@ -1620,7 +1620,7 @@ require_once __DIR__ . '/../includes/header.php';
                     <?php else: ?>
                         <?php foreach ($rows as $row): ?>
                             <?php
-                            $status = strtoupper((string)$row['status']);
+                            $status = strtoupper((string) $row['status']);
                             $statusClass = 'status-info';
 
                             if ($status === 'SELESAI') {
@@ -1631,15 +1631,11 @@ require_once __DIR__ . '/../includes/header.php';
                                 $statusClass = 'status-warning';
                             }
                             ?>
-                            <tr
-                                data-id="<?php echo h($row['id']); ?>"
-                                data-nomor="<?php echo h($row['nomor_pembelian']); ?>"
+                            <tr data-id="<?php echo h($row['id']); ?>" data-nomor="<?php echo h($row['nomor_pembelian']); ?>"
                                 data-tanggal="<?php echo h($row['tanggal']); ?>"
                                 data-supplier="<?php echo h($row['supplier_nama']); ?>"
-                                data-item="<?php echo h($row['jumlah_item']); ?>"
-                                data-status="<?php echo h($status); ?>"
-                                data-total="<?php echo h($row['total']); ?>"
-                            >
+                                data-item="<?php echo h($row['jumlah_item']); ?>" data-status="<?php echo h($status); ?>"
+                                data-total="<?php echo h($row['total']); ?>">
                                 <td>
                                     <strong><?php echo h($row['nomor_pembelian']); ?></strong>
                                 </td>
@@ -1655,11 +1651,8 @@ require_once __DIR__ . '/../includes/header.php';
                                     Rp <?php echo rupiah($row['total']); ?>
                                 </td>
                                 <td>
-                                    <button
-                                        type="button"
-                                        class="btn btn-outline btn-sm"
-                                        data-open-detail="<?php echo (int)$row['id']; ?>"
-                                    >
+                                    <button type="button" class="btn btn-outline btn-sm"
+                                        data-open-detail="<?php echo (int) $row['id']; ?>">
                                         Detail
                                     </button>
                                 </td>
@@ -1710,22 +1703,12 @@ require_once __DIR__ . '/../includes/header.php';
                 <div class="form-grid">
                     <div class="form-group">
                         <label>Nomor Pembelian <span>*</span></label>
-                        <input
-                            type="text"
-                            name="nomor_pembelian"
-                            placeholder="PO-20260909-0001"
-                            required
-                        >
+                        <input type="text" name="nomor_pembelian" placeholder="PO-20260909-0001" required>
                     </div>
 
                     <div class="form-group">
                         <label>Tanggal <span>*</span></label>
-                        <input
-                            type="date"
-                            name="tanggal"
-                            value="<?php echo date('Y-m-d'); ?>"
-                            required
-                        >
+                        <input type="date" name="tanggal" value="<?php echo date('Y-m-d'); ?>" required>
                     </div>
 
                     <div class="form-group form-group-full">
@@ -1733,7 +1716,7 @@ require_once __DIR__ . '/../includes/header.php';
                         <select name="supplier_id" required>
                             <option value="">-- Pilih Supplier --</option>
                             <?php foreach ($suppliers as $supplier): ?>
-                                <option value="<?php echo (int)$supplier['id']; ?>">
+                                <option value="<?php echo (int) $supplier['id']; ?>">
                                     <?php echo h($supplier['nama']); ?>
                                 </option>
                             <?php endforeach; ?>
@@ -1754,11 +1737,9 @@ require_once __DIR__ . '/../includes/header.php';
                         <select name="sparepart_id" id="createSparepart" required>
                             <option value="">-- Pilih Sparepart --</option>
                             <?php foreach ($spareparts as $sparepart): ?>
-                                <option
-                                    value="<?php echo (int)$sparepart['id']; ?>"
+                                <option value="<?php echo (int) $sparepart['id']; ?>"
                                     data-stok="<?php echo h($sparepart['stok']); ?>"
-                                    data-satuan="<?php echo h($sparepart['satuan']); ?>"
-                                >
+                                    data-satuan="<?php echo h($sparepart['satuan']); ?>">
                                     <?php
                                     echo h(
                                         $sparepart['kode'] . ' - ' .
@@ -1774,59 +1755,27 @@ require_once __DIR__ . '/../includes/header.php';
 
                     <div class="form-group">
                         <label>Qty <span>*</span></label>
-                        <input
-                            type="number"
-                            name="qty"
-                            id="createQty"
-                            min="0.01"
-                            step="0.01"
-                            value="1"
-                            required
-                        >
+                        <input type="number" name="qty" id="createQty" min="0.01" step="0.01" value="1" required>
                     </div>
 
                     <div class="form-group">
                         <label>Harga Beli per Satuan <span>*</span></label>
-                        <input
-                            type="number"
-                            name="harga"
-                            id="createHarga"
-                            min="0"
-                            step="0.01"
-                            value="0"
-                            required
-                        >
+                        <input type="number" name="harga" id="createHarga" min="0" step="0.01" value="0" required>
                     </div>
 
                     <div class="form-group">
                         <label>Diskon</label>
-                        <input
-                            type="number"
-                            name="diskon"
-                            id="createDiskon"
-                            min="0"
-                            step="0.01"
-                            value="0"
-                        >
+                        <input type="number" name="diskon" id="createDiskon" min="0" step="0.01" value="0">
                     </div>
 
                     <div class="form-group">
                         <label>Subtotal</label>
-                        <input
-                            type="text"
-                            id="createSubtotal"
-                            value="Rp 0"
-                            readonly
-                        >
+                        <input type="text" id="createSubtotal" value="Rp 0" readonly>
                     </div>
 
                     <div class="form-group form-group-full">
                         <label>Keterangan</label>
-                        <textarea
-                            name="keterangan"
-                            rows="3"
-                            placeholder="Keterangan pembelian..."
-                        ></textarea>
+                        <textarea name="keterangan" rows="3" placeholder="Keterangan pembelian..."></textarea>
                     </div>
                 </div>
             </div>
@@ -1949,7 +1898,7 @@ require_once __DIR__ . '/../includes/header.php';
                         <select name="supplier_id" id="editHeaderSupplier" required>
                             <option value="">-- Pilih Supplier --</option>
                             <?php foreach ($suppliers as $supplier): ?>
-                                <option value="<?php echo (int)$supplier['id']; ?>">
+                                <option value="<?php echo (int) $supplier['id']; ?>">
                                     <?php echo h($supplier['nama']); ?>
                                 </option>
                             <?php endforeach; ?>
@@ -2017,11 +1966,9 @@ require_once __DIR__ . '/../includes/header.php';
                         <select name="sparepart_id" id="addDetailSparepart" required>
                             <option value="">-- Pilih Sparepart --</option>
                             <?php foreach ($spareparts as $sparepart): ?>
-                                <option
-                                    value="<?php echo (int)$sparepart['id']; ?>"
+                                <option value="<?php echo (int) $sparepart['id']; ?>"
                                     data-stok="<?php echo h($sparepart['stok']); ?>"
-                                    data-satuan="<?php echo h($sparepart['satuan']); ?>"
-                                >
+                                    data-satuan="<?php echo h($sparepart['satuan']); ?>">
                                     <?php
                                     echo h(
                                         $sparepart['kode'] . ' - ' .
@@ -2098,11 +2045,9 @@ require_once __DIR__ . '/../includes/header.php';
                         <select name="sparepart_id" id="editDetailSparepart" required>
                             <option value="">-- Pilih Sparepart --</option>
                             <?php foreach ($spareparts as $sparepart): ?>
-                                <option
-                                    value="<?php echo (int)$sparepart['id']; ?>"
+                                <option value="<?php echo (int) $sparepart['id']; ?>"
                                     data-stok="<?php echo h($sparepart['stok']); ?>"
-                                    data-satuan="<?php echo h($sparepart['satuan']); ?>"
-                                >
+                                    data-satuan="<?php echo h($sparepart['satuan']); ?>">
                                     <?php
                                     echo h(
                                         $sparepart['kode'] . ' - ' .
@@ -2155,445 +2100,455 @@ require_once __DIR__ . '/../includes/header.php';
 </div>
 
 <script>
-(function () {
-    'use strict';
+    (function () {
+        'use strict';
 
-    var currentPurchase = null;
+        var currentPurchase = null;
 
-    function formatNumber(value) {
-        var number = Number(value || 0);
-        return new Intl.NumberFormat('id-ID', {
-            maximumFractionDigits: 2
-        }).format(number);
-    }
-
-    function escapeHtml(value) {
-        return String(value == null ? '' : value)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#039;');
-    }
-
-    window.openModal = function (id) {
-        var el = document.getElementById(id);
-        if (el) el.classList.add('show');
-        document.body.classList.add('modal-open');
-    };
-
-    window.closeModal = function (id) {
-        var el = document.getElementById(id);
-        if (el) el.classList.remove('show');
-
-        if (!document.querySelector('.modal-backdrop.show')) {
-            document.body.classList.remove('modal-open');
-        }
-    };
-
-    window.openCreateModal = function () {
-        var form = document.getElementById('createForm');
-        if (form) form.reset();
-
-        var dateInput = document.querySelector('#createForm input[name="tanggal"]');
-        if (dateInput) {
-            dateInput.value = new Date().toISOString().slice(0, 10);
+        function formatNumber(value) {
+            var number = Number(value || 0);
+            return new Intl.NumberFormat('id-ID', {
+                maximumFractionDigits: 2
+            }).format(number);
         }
 
-        document.getElementById('createHarga').value = '0';
-        document.getElementById('createQty').value = '1';
-        document.getElementById('createDiskon').value = '0';
-        document.getElementById('createSubtotal').value = 'Rp 0';
-        document.getElementById('createSparepartInfo').textContent = '';
+        function escapeHtml(value) {
+            return String(value == null ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
 
-        openModal('createModal');
-    };
+        window.openModal = function (id) {
+            var el = document.getElementById(id);
+            if (el) el.classList.add('show');
+            document.body.classList.add('modal-open');
+        };
 
-    function bindSparepartInfo(selectId, priceId, infoId) {
-        var select = document.getElementById(selectId);
-        var price = document.getElementById(priceId);
-        var info = document.getElementById(infoId);
+        window.closeModal = function (id) {
+            var el = document.getElementById(id);
+            if (el) el.classList.remove('show');
 
-        if (!select) return;
+            if (!document.querySelector('.modal-backdrop.show')) {
+                document.body.classList.remove('modal-open');
+            }
+        };
 
-        select.addEventListener('change', function () {
-            var option = select.options[select.selectedIndex];
+        window.openCreateModal = function () {
+            var form = document.getElementById('createForm');
+            if (form) form.reset();
 
-            if (!option || !option.value) {
-                if (info) info.textContent = '';
+            var dateInput = document.querySelector('#createForm input[name="tanggal"]');
+            if (dateInput) {
+                dateInput.value = new Date().toISOString().slice(0, 10);
+            }
+
+            document.getElementById('createHarga').value = '0';
+            document.getElementById('createQty').value = '1';
+            document.getElementById('createDiskon').value = '0';
+            document.getElementById('createSubtotal').value = 'Rp 0';
+            document.getElementById('createSparepartInfo').textContent = '';
+
+            openModal('createModal');
+        };
+
+        function bindSparepartInfo(selectId, priceId, infoId) {
+            var select = document.getElementById(selectId);
+            var price = document.getElementById(priceId);
+            var info = document.getElementById(infoId);
+
+            if (!select) return;
+
+            select.addEventListener('change', function () {
+                var option = select.options[select.selectedIndex];
+
+                if (!option || !option.value) {
+                    if (info) info.textContent = '';
+                    return;
+                }
+
+                var stok = Number(option.dataset.stok || 0);
+                var satuan = option.dataset.satuan || '';
+
+                if (info) {
+                    info.textContent = 'Stok saat ini: ' + formatNumber(stok) + (satuan ? ' ' + satuan : '') + '. Harga diisi sesuai harga transaksi pembelian.';
+                }
+
+                // Harga tidak lagi diambil dari tabel sparepart.
+                // Harga transaksi wajib berasal dari input pengguna dan disimpan
+                // pada pembelian_sparepart_detail.harga.
+                if (price && !price.value) price.value = '0';
+            });
+        }
+
+        function calculate(qtyId, priceId, discountId, resultId) {
+            var qty = Number((document.getElementById(qtyId) ? document.getElementById(qtyId).value : 0) || 0);
+            var price = Number((document.getElementById(priceId) ? document.getElementById(priceId).value : 0) || 0);
+            var discount = Number((document.getElementById(discountId) ? document.getElementById(discountId).value : 0) || 0);
+
+            var subtotal = Math.max(0, (qty * price) - discount);
+            var result = document.getElementById(resultId);
+
+            if (result) {
+                result.value = 'Rp ' + formatNumber(subtotal);
+            }
+        }
+
+        function calculateAll() {
+            calculate('createQty', 'createHarga', 'createDiskon', 'createSubtotal');
+            calculate('addDetailQty', 'addDetailHarga', 'addDetailDiskon', 'addDetailSubtotal');
+            calculate('editDetailQty', 'editDetailHarga', 'editDetailDiskon', 'editDetailSubtotal');
+        }
+
+        ['createQty', 'createHarga', 'createDiskon',
+            'addDetailQty', 'addDetailHarga', 'addDetailDiskon',
+            'editDetailQty', 'editDetailHarga', 'editDetailDiskon'
+        ].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el) el.addEventListener('input', calculateAll);
+        });
+
+        bindSparepartInfo('createSparepart', 'createHarga', 'createSparepartInfo');
+        bindSparepartInfo('addDetailSparepart', 'addDetailHarga', 'addDetailSparepartInfo');
+
+        var editSelect = document.getElementById('editDetailSparepart');
+        if (editSelect) {
+            editSelect.addEventListener('change', function () {
+                // Jangan mengubah harga otomatis saat sparepart diganti.
+                // Harga adalah histori transaksi dan harus diisi/ditinjau manual.
+                calculateAll();
+            });
+        }
+
+        window.openDetailModal = function (id) {
+            currentPurchase = null;
+
+            document.getElementById('detailBody').innerHTML =
+                '<tr><td colspan="8" class="empty-cell">Memuat data...</td></tr>';
+
+            document.getElementById('detailTotal').textContent = 'Rp 0';
+            document.getElementById('detailSubtitle').textContent = 'Memuat data...';
+
+            openModal('detailModal');
+
+            fetch('pembelian_sparepart.php?ajax=detail&id=' + encodeURIComponent(id), {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+                .then(function (response) {
+                    return response.json();
+                })
+                .then(function (data) {
+                    if (!data.success) {
+                        throw new Error(data.message || 'Gagal mengambil data.');
+                    }
+
+                    currentPurchase = data.purchase;
+
+                    document.getElementById('detailSubtitle').textContent =
+                        data.purchase.nomor_pembelian +
+                        ' • ' +
+                        data.purchase.supplier_nama;
+
+                    document.getElementById('detailSummary').innerHTML =
+                        '<div class="summary-item">' +
+                        '<span>Nomor Pembelian</span>' +
+                        '<strong>' + escapeHtml(data.purchase.nomor_pembelian) + '</strong>' +
+                        '</div>' +
+                        '<div class="summary-item">' +
+                        '<span>Tanggal</span>' +
+                        '<strong>' + escapeHtml(data.purchase.tanggal) + '</strong>' +
+                        '</div>' +
+                        '<div class="summary-item">' +
+                        '<span>Supplier</span>' +
+                        '<strong>' + escapeHtml(data.purchase.supplier_nama) + '</strong>' +
+                        '</div>' +
+                        '<div class="summary-item">' +
+                        '<span>Status</span>' +
+                        '<strong>' + escapeHtml(data.purchase.status) + '</strong>' +
+                        '</div>' +
+                        '<div class="summary-item">' +
+                        '<span>Total</span>' +
+                        '<strong>Rp ' + formatNumber(data.purchase.total) + '</strong>' +
+                        '</div>';
+
+                    renderDetails(data.details);
+                })
+                .catch(function (error) {
+                    document.getElementById('detailBody').innerHTML =
+                        '<tr><td colspan="8" class="empty-cell">' +
+                        escapeHtml(error.message) +
+                        '</td></tr>';
+                });
+        };
+
+        function renderDetails(details) {
+            var tbody = document.getElementById('detailBody');
+
+            if (!details || details.length === 0) {
+                tbody.innerHTML =
+                    '<tr><td colspan="8" class="empty-cell">' +
+                    'Belum ada detail sparepart.' +
+                    '</td></tr>';
+
+                document.getElementById('detailTotal').textContent = 'Rp 0';
                 return;
             }
 
-            var stok = Number(option.dataset.stok || 0);
-            var satuan = option.dataset.satuan || '';
+            var html = '';
+            var total = 0;
 
-            if (info) {
-                info.textContent = 'Stok saat ini: ' + formatNumber(stok) + (satuan ? ' ' + satuan : '') + '. Harga diisi sesuai harga transaksi pembelian.';
-            }
+            details.forEach(function (detail, index) {
+                total += Number(detail.subtotal || 0);
 
-            // Harga tidak lagi diambil dari tabel sparepart.
-            // Harga transaksi wajib berasal dari input pengguna dan disimpan
-            // pada pembelian_sparepart_detail.harga.
-            if (price && !price.value) price.value = '0';
-        });
-    }
-
-    function calculate(qtyId, priceId, discountId, resultId) {
-        var qty = Number((document.getElementById(qtyId) ? document.getElementById(qtyId).value : 0) || 0);
-        var price = Number((document.getElementById(priceId) ? document.getElementById(priceId).value : 0) || 0);
-        var discount = Number((document.getElementById(discountId) ? document.getElementById(discountId).value : 0) || 0);
-
-        var subtotal = Math.max(0, (qty * price) - discount);
-        var result = document.getElementById(resultId);
-
-        if (result) {
-            result.value = 'Rp ' + formatNumber(subtotal);
-        }
-    }
-
-    function calculateAll() {
-        calculate('createQty', 'createHarga', 'createDiskon', 'createSubtotal');
-        calculate('addDetailQty', 'addDetailHarga', 'addDetailDiskon', 'addDetailSubtotal');
-        calculate('editDetailQty', 'editDetailHarga', 'editDetailDiskon', 'editDetailSubtotal');
-    }
-
-    ['createQty', 'createHarga', 'createDiskon',
-     'addDetailQty', 'addDetailHarga', 'addDetailDiskon',
-     'editDetailQty', 'editDetailHarga', 'editDetailDiskon'
-    ].forEach(function (id) {
-        var el = document.getElementById(id);
-        if (el) el.addEventListener('input', calculateAll);
-    });
-
-    bindSparepartInfo('createSparepart', 'createHarga', 'createSparepartInfo');
-    bindSparepartInfo('addDetailSparepart', 'addDetailHarga', 'addDetailSparepartInfo');
-
-    var editSelect = document.getElementById('editDetailSparepart');
-    if (editSelect) {
-        editSelect.addEventListener('change', function () {
-            // Jangan mengubah harga otomatis saat sparepart diganti.
-            // Harga adalah histori transaksi dan harus diisi/ditinjau manual.
-            calculateAll();
-        });
-    }
-
-    window.openDetailModal = function (id) {
-        currentPurchase = null;
-
-        document.getElementById('detailBody').innerHTML =
-            '<tr><td colspan="8" class="empty-cell">Memuat data...</td></tr>';
-
-        document.getElementById('detailTotal').textContent = 'Rp 0';
-        document.getElementById('detailSubtitle').textContent = 'Memuat data...';
-
-        openModal('detailModal');
-
-        fetch('pembelian_sparepart.php?ajax=detail&id=' + encodeURIComponent(id), {
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest'
-            }
-        })
-        .then(function (response) {
-            return response.json();
-        })
-        .then(function (data) {
-            if (!data.success) {
-                throw new Error(data.message || 'Gagal mengambil data.');
-            }
-
-            currentPurchase = data.purchase;
-
-            document.getElementById('detailSubtitle').textContent =
-                data.purchase.nomor_pembelian +
-                ' • ' +
-                data.purchase.supplier_nama;
-
-            document.getElementById('detailSummary').innerHTML =
-                '<div class="summary-item">' +
-                    '<span>Nomor Pembelian</span>' +
-                    '<strong>' + escapeHtml(data.purchase.nomor_pembelian) + '</strong>' +
-                '</div>' +
-                '<div class="summary-item">' +
-                    '<span>Tanggal</span>' +
-                    '<strong>' + escapeHtml(data.purchase.tanggal) + '</strong>' +
-                '</div>' +
-                '<div class="summary-item">' +
-                    '<span>Supplier</span>' +
-                    '<strong>' + escapeHtml(data.purchase.supplier_nama) + '</strong>' +
-                '</div>' +
-                '<div class="summary-item">' +
-                    '<span>Status</span>' +
-                    '<strong>' + escapeHtml(data.purchase.status) + '</strong>' +
-                '</div>' +
-                '<div class="summary-item">' +
-                    '<span>Total</span>' +
-                    '<strong>Rp ' + formatNumber(data.purchase.total) + '</strong>' +
-                '</div>';
-
-            renderDetails(data.details);
-        })
-        .catch(function (error) {
-            document.getElementById('detailBody').innerHTML =
-                '<tr><td colspan="8" class="empty-cell">' +
-                escapeHtml(error.message) +
-                '</td></tr>';
-        });
-    };
-
-    function renderDetails(details) {
-        var tbody = document.getElementById('detailBody');
-
-        if (!details || details.length === 0) {
-            tbody.innerHTML =
-                '<tr><td colspan="8" class="empty-cell">' +
-                'Belum ada detail sparepart.' +
-                '</td></tr>';
-
-            document.getElementById('detailTotal').textContent = 'Rp 0';
-            return;
-        }
-
-        var html = '';
-        var total = 0;
-
-        details.forEach(function (detail, index) {
-            total += Number(detail.subtotal || 0);
-
-            html +=
-                '<tr>' +
+                html +=
+                    '<tr>' +
                     '<td>' + (index + 1) + '</td>' +
                     '<td><strong>' + escapeHtml(detail.kode) + '</strong></td>' +
                     '<td>' +
-                        escapeHtml(detail.nama) +
-                        (detail.part_number ?
-                            '<small class="table-subtext">' +
-                            escapeHtml(detail.part_number) +
-                            '</small>' : '') +
+                    escapeHtml(detail.nama) +
+                    (detail.part_number ?
+                        '<small class="table-subtext">' +
+                        escapeHtml(detail.part_number) +
+                        '</small>' : '') +
                     '</td>' +
                     '<td>' +
-                        formatNumber(detail.qty) +
-                        (detail.satuan ? ' ' + escapeHtml(detail.satuan) : '') +
+                    formatNumber(detail.qty) +
+                    (detail.satuan ? ' ' + escapeHtml(detail.satuan) : '') +
                     '</td>' +
                     '<td class="money-cell">Rp ' + formatNumber(detail.harga) + '</td>' +
                     '<td class="money-cell">Rp ' + formatNumber(detail.diskon) + '</td>' +
                     '<td class="money-cell"><strong>Rp ' + formatNumber(detail.subtotal) + '</strong></td>' +
                     '<td>' +
-                        '<button type="button" class="btn btn-outline btn-xs" ' +
-                            'onclick=\'openEditDetail(' + JSON.stringify(detail).replace(/'/g, '&#039;') + ')\'>' +
-                            'Edit' +
-                        '</button> ' +
-                        '<form method="post" class="inline-form" onsubmit="return confirm(&#39;Hapus detail ini? Stok akan disesuaikan jika transaksi SELESAI.&#39;)">' +
-                            '<input type="hidden" name="action" value="delete_detail">' +
-                            '<input type="hidden" name="detail_id" value="' + Number(detail.id) + '">' +
-                            '<button type="submit" class="btn btn-danger-outline btn-xs">Hapus</button>' +
-                        '</form>' +
+                    '<button type="button" class="btn btn-outline btn-xs" ' +
+                    'onclick=\'openEditDetail(' + JSON.stringify(detail).replace(/'/g, '&#039;') + ')\'>' +
+                    'Edit' +
+                    '</button> ' +
+                    '<form method="post" class="inline-form" onsubmit="return confirm(&#39;Hapus detail ini? Stok akan disesuaikan jika transaksi SELESAI.&#39;)">' +
+                    '<input type="hidden" name="action" value="delete_detail">' +
+                    '<input type="hidden" name="detail_id" value="' + Number(detail.id) + '">' +
+                    '<button type="submit" class="btn btn-danger-outline btn-xs">Hapus</button>' +
+                    '</form>' +
                     '</td>' +
-                '</tr>';
-        });
+                    '</tr>';
+            });
 
-        tbody.innerHTML = html;
-        document.getElementById('detailTotal').textContent =
-            'Rp ' + formatNumber(total);
-    }
-
-    window.openEditDetail = function (detail) {
-        document.getElementById('editDetailId').value = detail.id;
-        document.getElementById('editDetailSparepart').value = detail.sparepart_id;
-        document.getElementById('editDetailQty').value = detail.qty;
-        document.getElementById('editDetailHarga').value = detail.harga;
-        document.getElementById('editDetailDiskon').value = detail.diskon;
-        document.getElementById('editDetailKeterangan').value = detail.keterangan || '';
-
-        calculateAll();
-        openModal('editDetailModal');
-    };
-
-    var openCreatePurchaseBtn = document.getElementById('openCreatePurchaseBtn');
-    if (openCreatePurchaseBtn) {
-        openCreatePurchaseBtn.addEventListener('click', function () {
-            openCreateModal();
-        });
-    }
-
-    document.querySelectorAll('[data-open-detail]').forEach(function (button) {
-        button.addEventListener('click', function () {
-            var id = Number(button.getAttribute('data-open-detail'));
-            if (id > 0) {
-                openDetailModal(id);
-            }
-        });
-    });
-
-    document.getElementById('editHeaderBtn').addEventListener('click', function () {
-        if (!currentPurchase) return;
-
-        document.getElementById('editHeaderId').value = currentPurchase.id;
-        document.getElementById('editHeaderNomor').value = currentPurchase.nomor_pembelian;
-        document.getElementById('editHeaderTanggal').value = currentPurchase.tanggal;
-        document.getElementById('editHeaderSupplier').value = currentPurchase.supplier_id;
-        document.getElementById('editHeaderStatus').value = currentPurchase.status;
-        document.getElementById('editHeaderKeterangan').value = currentPurchase.keterangan || '';
-
-        closeModal('detailModal');
-        openModal('editHeaderModal');
-    });
-
-    document.getElementById('addDetailBtn').addEventListener('click', function () {
-        if (!currentPurchase) return;
-
-        document.getElementById('addDetailPurchaseId').value = currentPurchase.id;
-        document.getElementById('addDetailSubtitle').textContent =
-            'Tambahkan item ke ' + currentPurchase.nomor_pembelian;
-
-        document.getElementById('addDetailSparepart').value = '';
-        document.getElementById('addDetailQty').value = '1';
-        document.getElementById('addDetailHarga').value = '0';
-        document.getElementById('addDetailDiskon').value = '0';
-        document.getElementById('addDetailSubtotal').value = 'Rp 0';
-        document.getElementById('addDetailSparepartInfo').textContent = '';
-
-        closeModal('detailModal');
-        openModal('addDetailModal');
-    });
-
-    document.getElementById('deletePurchaseBtn').addEventListener('click', function () {
-        if (!currentPurchase) return;
-
-        if (!confirm(
-            'Hapus transaksi ' +
-            currentPurchase.nomor_pembelian +
-            '? Semua detail akan ikut dihapus.'
-        )) {
-            return;
+            tbody.innerHTML = html;
+            document.getElementById('detailTotal').textContent =
+                'Rp ' + formatNumber(total);
         }
 
-        var form = document.createElement('form');
-        form.method = 'post';
-        form.innerHTML =
-            '<input type="hidden" name="action" value="delete_purchase">' +
-            '<input type="hidden" name="id" value="' + Number(currentPurchase.id) + '">';
+        window.openEditDetail = function (detail) {
+            document.getElementById('editDetailId').value = detail.id;
+            document.getElementById('editDetailSparepart').value = detail.sparepart_id;
+            document.getElementById('editDetailQty').value = detail.qty;
+            document.getElementById('editDetailHarga').value = detail.harga;
+            document.getElementById('editDetailDiskon').value = detail.diskon;
+            document.getElementById('editDetailKeterangan').value = detail.keterangan || '';
 
-        document.body.appendChild(form);
-        form.submit();
-    });
+            calculateAll();
+            openModal('editDetailModal');
+        };
 
-    /*
-    |--------------------------------------------------------------------------
-    | FILTER + PAGINATION
-    |--------------------------------------------------------------------------
-    */
-    var table = document.getElementById('purchaseTable');
-    var rows = Array.prototype.slice.call(table.querySelectorAll('tbody tr[data-id]'));
-    var filterInputs = Array.prototype.slice.call(
-        table.querySelectorAll('thead .filter-row input')
-    );
-    var pageSizeSelect = document.getElementById('pageSize');
-    var prevButton = document.getElementById('prevPage');
-    var nextButton = document.getElementById('nextPage');
-    var tableInfo = document.getElementById('tableInfo');
-    var pageNumber = document.getElementById('pageNumber');
+        var openCreatePurchaseBtn = document.getElementById('openCreatePurchaseBtn');
+        if (openCreatePurchaseBtn) {
+            openCreatePurchaseBtn.addEventListener('click', function () {
+                openCreateModal();
+            });
+        }
 
-    var currentPage = 1;
-
-    function getFilteredRows() {
-        return rows.filter(function (row) {
-            return filterInputs.every(function (input, index) {
-                var value = input.value.trim().toLowerCase();
-
-                if (!value) return true;
-
-                var field = ['nomor', 'tanggal', 'supplier', 'item', 'status', 'total'][index];
-                return String(row.dataset[field] || '').toLowerCase().includes(value);
+        document.querySelectorAll('[data-open-detail]').forEach(function (button) {
+            button.addEventListener('click', function () {
+                var id = Number(button.getAttribute('data-open-detail'));
+                if (id > 0) {
+                    openDetailModal(id);
+                }
             });
         });
-    }
 
-    function renderTable() {
-        var filtered = getFilteredRows();
-        var pageSize = Number(pageSizeSelect.value || 10);
-        var totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+        document.getElementById('editHeaderBtn').addEventListener('click', function () {
+            if (!currentPurchase) return;
 
-        if (currentPage > totalPages) {
-            currentPage = totalPages;
+            document.getElementById('editHeaderId').value = currentPurchase.id;
+            document.getElementById('editHeaderNomor').value = currentPurchase.nomor_pembelian;
+            document.getElementById('editHeaderTanggal').value = currentPurchase.tanggal;
+            document.getElementById('editHeaderSupplier').value = currentPurchase.supplier_id;
+            document.getElementById('editHeaderStatus').value = currentPurchase.status;
+            document.getElementById('editHeaderKeterangan').value = currentPurchase.keterangan || '';
+
+            closeModal('detailModal');
+            openModal('editHeaderModal');
+        });
+
+        document.getElementById('addDetailBtn').addEventListener('click', function () {
+            if (!currentPurchase) return;
+
+            document.getElementById('addDetailPurchaseId').value = currentPurchase.id;
+            document.getElementById('addDetailSubtitle').textContent =
+                'Tambahkan item ke ' + currentPurchase.nomor_pembelian;
+
+            document.getElementById('addDetailSparepart').value = '';
+            document.getElementById('addDetailQty').value = '1';
+            document.getElementById('addDetailHarga').value = '0';
+            document.getElementById('addDetailDiskon').value = '0';
+            document.getElementById('addDetailSubtotal').value = 'Rp 0';
+            document.getElementById('addDetailSparepartInfo').textContent = '';
+
+            closeModal('detailModal');
+            openModal('addDetailModal');
+        });
+
+        document.getElementById('deletePurchaseBtn').addEventListener('click', function () {
+            if (!currentPurchase) return;
+
+            if (!confirm(
+                'Hapus transaksi ' +
+                currentPurchase.nomor_pembelian +
+                '? Semua detail akan ikut dihapus.'
+            )) {
+                return;
+            }
+
+            var form = document.createElement('form');
+            form.method = 'post';
+            form.innerHTML =
+                '<input type="hidden" name="action" value="delete_purchase">' +
+                '<input type="hidden" name="id" value="' + Number(currentPurchase.id) + '">';
+
+            document.body.appendChild(form);
+            form.submit();
+        });
+
+        /*
+        |--------------------------------------------------------------------------
+        | FILTER + PAGINATION
+        |--------------------------------------------------------------------------
+        */
+        var table = document.getElementById('purchaseTable');
+        var rows = Array.prototype.slice.call(table.querySelectorAll('tbody tr[data-id]'));
+        var filterInputs = Array.prototype.slice.call(
+            table.querySelectorAll('thead .filter-row input')
+        );
+        var pageSizeSelect = document.getElementById('pageSize');
+        var prevButton = document.getElementById('prevPage');
+        var nextButton = document.getElementById('nextPage');
+        var tableInfo = document.getElementById('tableInfo');
+        var pageNumber = document.getElementById('pageNumber');
+
+        var currentPage = 1;
+
+        function getFilteredRows() {
+            return rows.filter(function (row) {
+                return filterInputs.every(function (input, index) {
+                    var value = input.value.trim().toLowerCase();
+
+                    if (!value) return true;
+
+                    var field = ['nomor', 'tanggal', 'supplier', 'item', 'status', 'total'][index];
+                    return String(row.dataset[field] || '').toLowerCase().includes(value);
+                });
+            });
         }
 
-        rows.forEach(function (row) {
-            row.style.display = 'none';
+        function renderTable() {
+            var filtered = getFilteredRows();
+            var pageSize = Number(pageSizeSelect.value || 10);
+            var totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+
+            if (currentPage > totalPages) {
+                currentPage = totalPages;
+            }
+
+            rows.forEach(function (row) {
+                row.style.display = 'none';
+            });
+
+            var start = (currentPage - 1) * pageSize;
+            var end = Math.min(start + pageSize, filtered.length);
+
+            filtered.slice(start, end).forEach(function (row) {
+                row.style.display = '';
+            });
+
+            tableInfo.textContent =
+                filtered.length === 0
+                    ? 'Tidak ada data'
+                    : 'Menampilkan ' + (start + 1) + ' sampai ' + end +
+                    ' dari ' + filtered.length + ' transaksi';
+
+            pageNumber.textContent = currentPage + ' / ' + totalPages;
+
+            prevButton.disabled = currentPage <= 1;
+            nextButton.disabled = currentPage >= totalPages;
+        }
+
+        filterInputs.forEach(function (input) {
+            input.addEventListener('input', function () {
+                currentPage = 1;
+                renderTable();
+            });
         });
 
-        var start = (currentPage - 1) * pageSize;
-        var end = Math.min(start + pageSize, filtered.length);
-
-        filtered.slice(start, end).forEach(function (row) {
-            row.style.display = '';
-        });
-
-        tableInfo.textContent =
-            filtered.length === 0
-                ? 'Tidak ada data'
-                : 'Menampilkan ' + (start + 1) + ' sampai ' + end +
-                  ' dari ' + filtered.length + ' transaksi';
-
-        pageNumber.textContent = currentPage + ' / ' + totalPages;
-
-        prevButton.disabled = currentPage <= 1;
-        nextButton.disabled = currentPage >= totalPages;
-    }
-
-    filterInputs.forEach(function (input) {
-        input.addEventListener('input', function () {
+        pageSizeSelect.addEventListener('change', function () {
             currentPage = 1;
             renderTable();
         });
-    });
 
-    pageSizeSelect.addEventListener('change', function () {
-        currentPage = 1;
-        renderTable();
-    });
-
-    prevButton.addEventListener('click', function () {
-        if (currentPage > 1) {
-            currentPage--;
-            renderTable();
-        }
-    });
-
-    nextButton.addEventListener('click', function () {
-        var filtered = getFilteredRows();
-        var totalPages = Math.max(
-            1,
-            Math.ceil(filtered.length / Number(pageSizeSelect.value || 10))
-        );
-
-        if (currentPage < totalPages) {
-            currentPage++;
-            renderTable();
-        }
-    });
-
-    document.querySelectorAll('.modal-backdrop').forEach(function (backdrop) {
-        backdrop.addEventListener('click', function (event) {
-            if (event.target === backdrop) {
-                closeModal(backdrop.id);
+        prevButton.addEventListener('click', function () {
+            if (currentPage > 1) {
+                currentPage--;
+                renderTable();
             }
         });
-    });
 
-    calculateAll();
-    renderTable();
+        nextButton.addEventListener('click', function () {
+            var filtered = getFilteredRows();
+            var totalPages = Math.max(
+                1,
+                Math.ceil(filtered.length / Number(pageSizeSelect.value || 10))
+            );
 
-    // Jika kembali dari proses tambah barang, langsung buka detail pembelian
-    // yang bersangkutan.
-    var params = new URLSearchParams(window.location.search);
-    var openPurchaseId = Number(params.get('open_purchase') || 0);
+            if (currentPage < totalPages) {
+                currentPage++;
+                renderTable();
+            }
+        });
 
-    if (openPurchaseId > 0) {
-        window.setTimeout(function () {
-            openDetailModal(openPurchaseId);
-        }, 50);
-    }
-})();
+        document.querySelectorAll('.modal-backdrop').forEach(function (backdrop) {
+            backdrop.addEventListener('click', function (event) {
+                if (event.target === backdrop) {
+                    closeModal(backdrop.id);
+                }
+            });
+        });
+
+        calculateAll();
+        renderTable();
+
+        // Jika kembali dari proses tambah barang, langsung buka detail pembelian
+        // yang bersangkutan.
+        var params = new URLSearchParams(window.location.search);
+        var openPurchaseId = Number(params.get('open_purchase') || 0);
+
+        if (openPurchaseId > 0) {
+            window.setTimeout(function () {
+                openDetailModal(openPurchaseId);
+
+                // Hapus parameter open_purchase dari URL tanpa reload halaman.
+                params.delete('open_purchase');
+
+                var cleanQuery = params.toString();
+                var cleanUrl = window.location.pathname +
+                    (cleanQuery ? '?' + cleanQuery : '') +
+                    window.location.hash;
+
+                window.history.replaceState({}, document.title, cleanUrl);
+            }, 50);
+        }
+    })();
 </script>
 
 
