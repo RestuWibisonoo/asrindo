@@ -79,6 +79,7 @@ $adminRole = isset($_SESSION['admin_role']) ? $_SESSION['admin_role'] : 'ADMIN';
                     <a href="<?php echo $adminBase; ?>admin/pemasukan.php">Pemasukan</a>
                     <a href="<?php echo $adminBase; ?>admin/pengeluaran.php">Pengeluaran</a>
                     <a href="<?php echo $adminBase; ?>admin/kategori_keuangan.php">Kategori Keuangan</a>
+                    <a href="<?php echo $adminBase; ?>admin/rekening.php">Rekening</a>
                 </div>
             </div>
 
