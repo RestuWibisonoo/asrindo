@@ -2581,6 +2581,13 @@ require_once __DIR__ . '/../includes/header.php';
         openDetailModal(openDetailId);
     }
     <?php endif; ?>
+
+    <?php if (isset($_GET['msg']) || isset($_GET['open_detail_id'])): ?>
+    if (window.history.replaceState) {
+        var cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+        window.history.replaceState({path: cleanUrl}, '', cleanUrl);
+    }
+    <?php endif; ?>
 })();
 </script>
 
