@@ -24,12 +24,18 @@ function rupiah($value): string
     return number_format((float)($value ?? 0), 0, ',', '.');
 }
 
-function redirectMessage(string $type, string $message): void
+function redirectMessage(string $type, string $message, ?int $openPurchaseId = null): void
 {
-    header('Location: pembelian_sparepart.php?' . http_build_query([
+    $params = [
         'msg_type' => $type,
         'msg' => $message
-    ]));
+    ];
+
+    if ($openPurchaseId !== null && $openPurchaseId > 0) {
+        $params['open_purchase'] = $openPurchaseId;
+    }
+
+    header('Location: pembelian_sparepart.php?' . http_build_query($params));
     exit;
 }
 
@@ -672,7 +678,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $pdo->commit();
 
-            redirectMessage('success', 'Detail sparepart berhasil ditambahkan.');
+            // Setelah tambah barang, buka kembali pembelian yang bersangkutan
+            // agar item yang baru disimpan langsung terlihat di detail nota.
+            redirectMessage(
+                'success',
+                'Detail sparepart berhasil ditambahkan.',
+                (int)$purchaseId
+            );
         }
 
         /*
@@ -2570,6 +2582,17 @@ require_once __DIR__ . '/../includes/header.php';
 
     calculateAll();
     renderTable();
+
+    // Jika kembali dari proses tambah barang, langsung buka detail pembelian
+    // yang bersangkutan.
+    var params = new URLSearchParams(window.location.search);
+    var openPurchaseId = Number(params.get('open_purchase') || 0);
+
+    if (openPurchaseId > 0) {
+        window.setTimeout(function () {
+            openDetailModal(openPurchaseId);
+        }, 50);
+    }
 })();
 </script>
 

@@ -17,12 +17,12 @@ $adminBase = '../';
 
 function h($value): string
 {
-    return htmlspecialchars((string)($value ?? ''), ENT_QUOTES, 'UTF-8');
+    return htmlspecialchars((string) ($value ?? ''), ENT_QUOTES, 'UTF-8');
 }
 
 function rupiah($value): string
 {
-    return 'Rp ' . number_format((float)($value ?? 0), 0, ',', '.');
+    return 'Rp ' . number_format((float) ($value ?? 0), 0, ',', '.');
 }
 
 function redirectDetail(int $id, string $type, string $message): void
@@ -47,17 +47,17 @@ function generateNomorPengeluaran(PDO $pdo, string $tanggal): string
         LIMIT 1
     ");
     $stmt->execute([$prefix . '%']);
-    $last = (string)$stmt->fetchColumn();
+    $last = (string) $stmt->fetchColumn();
 
     $next = 1;
     if ($last !== '') {
         $suffix = substr($last, -4);
         if (ctype_digit($suffix)) {
-            $next = (int)$suffix + 1;
+            $next = (int) $suffix + 1;
         }
     }
 
-    return $prefix . str_pad((string)$next, 4, '0', STR_PAD_LEFT);
+    return $prefix . str_pad((string) $next, 4, '0', STR_PAD_LEFT);
 }
 
 $id = filter_var($_GET['id'] ?? $_POST['pembelian_id'] ?? null, FILTER_VALIDATE_INT);
@@ -72,16 +72,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     try {
         if ($action === 'update_header') {
-            $nomor = trim((string)($_POST['nomor_pembelian'] ?? ''));
-            $tanggal = trim((string)($_POST['tanggal'] ?? ''));
+            $nomor = trim((string) ($_POST['nomor_pembelian'] ?? ''));
+            $tanggal = trim((string) ($_POST['tanggal'] ?? ''));
             $supplierId = filter_var($_POST['supplier_id'] ?? null, FILTER_VALIDATE_INT);
-            $estimasi = trim((string)($_POST['estimasi_kedatangan'] ?? ''));
-            $kedatangan = trim((string)($_POST['kedatangan_aktual'] ?? ''));
-            $kurs = (float)($_POST['kurs_pembelian'] ?? 0);
-            $bea = (float)($_POST['biaya_bea_cukai'] ?? 0);
-            $pengiriman = (float)($_POST['biaya_pengiriman'] ?? 0);
-            $lain = (float)($_POST['biaya_lain'] ?? 0);
-            $keterangan = trim((string)($_POST['keterangan'] ?? ''));
+            $estimasi = trim((string) ($_POST['estimasi_kedatangan'] ?? ''));
+            $kedatangan = trim((string) ($_POST['kedatangan_aktual'] ?? ''));
+            $kurs = (float) ($_POST['kurs_pembelian'] ?? 0);
+            $bea = (float) ($_POST['biaya_bea_cukai'] ?? 0);
+            $pengiriman = (float) ($_POST['biaya_pengiriman'] ?? 0);
+            $lain = (float) ($_POST['biaya_lain'] ?? 0);
+            $keterangan = trim((string) ($_POST['keterangan'] ?? ''));
 
             if ($nomor === '' || $tanggal === '' || !$supplierId) {
                 throw new RuntimeException('Nomor pembelian, tanggal, dan supplier wajib diisi.');
@@ -103,7 +103,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!$purchase) {
                 throw new RuntimeException('Pembelian tidak ditemukan.');
             }
-            if (strtoupper((string)$purchase['status']) === 'BATAL') {
+            if (strtoupper((string) $purchase['status']) === 'BATAL') {
                 throw new RuntimeException('Pembelian BATAL tidak dapat diedit.');
             }
 
@@ -130,7 +130,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 WHERE pembelian_id = ?
             ");
             $stmt->execute([$id]);
-            $detailSubtotal = (float)$stmt->fetchColumn();
+            $detailSubtotal = (float) $stmt->fetchColumn();
 
             $newTotal = $detailSubtotal + $bea + $pengiriman + $lain;
 
@@ -140,7 +140,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 WHERE pembelian_alat_berat_id = ? AND status <> 'BATAL'
             ");
             $stmt->execute([$id]);
-            $scheduled = (float)$stmt->fetchColumn();
+            $scheduled = (float) $stmt->fetchColumn();
 
             if ($newTotal + 0.00001 < $scheduled) {
                 throw new RuntimeException(
@@ -186,9 +186,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($action === 'add_unit') {
             $alatId = filter_var($_POST['alat_berat_id'] ?? null, FILTER_VALIDATE_INT);
-            $hargaBeli = (float)($_POST['harga_beli'] ?? 0);
-            $hargaUsd = (float)($_POST['harga_usd'] ?? 0);
-            $keterangan = trim((string)($_POST['detail_keterangan'] ?? ''));
+            $hargaBeli = (float) ($_POST['harga_beli'] ?? 0);
+            $hargaUsd = (float) ($_POST['harga_usd'] ?? 0);
+            $keterangan = trim((string) ($_POST['detail_keterangan'] ?? ''));
 
             if (!$alatId) {
                 throw new RuntimeException('Unit alat berat wajib dipilih.');
@@ -236,7 +236,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!$purchase) {
                 throw new RuntimeException('Pembelian tidak ditemukan.');
             }
-            if (strtoupper((string)$purchase['status']) === 'BATAL') {
+            if (strtoupper((string) $purchase['status']) === 'BATAL') {
                 throw new RuntimeException('Pembelian BATAL tidak dapat ditambah unit.');
             }
 
@@ -272,9 +272,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($action === 'update_unit') {
             $detailId = filter_var($_POST['detail_id'] ?? null, FILTER_VALIDATE_INT);
             $alatId = filter_var($_POST['alat_berat_id'] ?? null, FILTER_VALIDATE_INT);
-            $hargaBeli = (float)($_POST['harga_beli'] ?? 0);
-            $hargaUsd = (float)($_POST['harga_usd'] ?? 0);
-            $keterangan = trim((string)($_POST['detail_keterangan'] ?? ''));
+            $hargaBeli = (float) ($_POST['harga_beli'] ?? 0);
+            $hargaUsd = (float) ($_POST['harga_usd'] ?? 0);
+            $keterangan = trim((string) ($_POST['detail_keterangan'] ?? ''));
 
             if (!$detailId || !$alatId) {
                 throw new RuntimeException('Detail unit tidak valid.');
@@ -297,11 +297,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!$detail) {
                 throw new RuntimeException('Detail unit tidak ditemukan.');
             }
-            if (strtoupper((string)$detail['status']) === 'BATAL') {
+            if (strtoupper((string) $detail['status']) === 'BATAL') {
                 throw new RuntimeException('Pembelian BATAL tidak dapat diedit.');
             }
 
-            if ((int)$detail['old_alat_id'] !== $alatId) {
+            if ((int) $detail['old_alat_id'] !== $alatId) {
                 $stmt = $pdo->prepare("
                     SELECT d.id
                     FROM pembelian_alat_berat_detail d
@@ -348,7 +348,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 SELECT total FROM pembelian_alat_berat WHERE id = ? FOR UPDATE
             ");
             $stmt->execute([$id]);
-            $newTotal = (float)$stmt->fetchColumn();
+            $newTotal = (float) $stmt->fetchColumn();
 
             $stmt = $pdo->prepare("
                 SELECT COALESCE(SUM(nominal), 0)
@@ -356,7 +356,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 WHERE pembelian_alat_berat_id = ? AND status <> 'BATAL'
             ");
             $stmt->execute([$id]);
-            $scheduled = (float)$stmt->fetchColumn();
+            $scheduled = (float) $stmt->fetchColumn();
 
             if ($newTotal + 0.00001 < $scheduled) {
                 throw new RuntimeException('Perubahan unit membuat total pembelian lebih kecil dari total termin yang sudah dibuat.');
@@ -386,7 +386,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!$detail) {
                 throw new RuntimeException('Detail unit tidak ditemukan.');
             }
-            if (strtoupper((string)$detail['status']) === 'BATAL') {
+            if (strtoupper((string) $detail['status']) === 'BATAL') {
                 throw new RuntimeException('Pembelian BATAL tidak dapat diubah.');
             }
 
@@ -396,7 +396,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 WHERE pembelian_alat_berat_id = ? AND status <> 'BATAL'
             ");
             $stmt->execute([$id]);
-            $scheduled = (float)$stmt->fetchColumn();
+            $scheduled = (float) $stmt->fetchColumn();
 
             $stmt = $pdo->prepare("
                 SELECT COALESCE(SUM(subtotal), 0)
@@ -404,7 +404,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 WHERE pembelian_id = ? AND id <> ?
             ");
             $stmt->execute([$id, $detailId]);
-            $detailSubtotal = (float)$stmt->fetchColumn();
+            $detailSubtotal = (float) $stmt->fetchColumn();
 
             $stmt = $pdo->prepare("
                 SELECT biaya_bea_cukai, biaya_pengiriman, biaya_lain
@@ -414,9 +414,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $cost = $stmt->fetch(PDO::FETCH_ASSOC);
 
             $newTotal = $detailSubtotal
-                + (float)$cost['biaya_bea_cukai']
-                + (float)$cost['biaya_pengiriman']
-                + (float)$cost['biaya_lain'];
+                + (float) $cost['biaya_bea_cukai']
+                + (float) $cost['biaya_pengiriman']
+                + (float) $cost['biaya_lain'];
 
             if ($newTotal + 0.00001 < $scheduled) {
                 throw new RuntimeException('Unit tidak dapat dihapus karena total pembelian akan lebih kecil dari termin yang sudah dibuat.');
@@ -441,9 +441,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if ($action === 'add_payment_plan') {
-            $jenis = strtoupper(trim((string)($_POST['jenis_pembayaran'] ?? '')));
-            $tanggalJatuhTempo = trim((string)($_POST['tanggal_jatuh_tempo'] ?? ''));
-            $nominal = (float)($_POST['nominal'] ?? 0);
+            $jenis = strtoupper(trim((string) ($_POST['jenis_pembayaran'] ?? '')));
+            $tanggalJatuhTempo = trim((string) ($_POST['tanggal_jatuh_tempo'] ?? ''));
+            $nominal = (float) ($_POST['nominal'] ?? 0);
 
             if (!in_array($jenis, ['DP', 'CICILAN', 'PELUNASAN', 'LAINNYA'], true)) {
                 throw new RuntimeException('Jenis pembayaran tidak valid.');
@@ -468,7 +468,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!$purchase) {
                 throw new RuntimeException('Pembelian tidak ditemukan.');
             }
-            if (strtoupper((string)$purchase['status']) === 'BATAL') {
+            if (strtoupper((string) $purchase['status']) === 'BATAL') {
                 throw new RuntimeException('Pembelian BATAL tidak dapat dibuatkan termin.');
             }
             if ($tanggalJatuhTempo < $purchase['tanggal']) {
@@ -481,9 +481,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 WHERE pembelian_alat_berat_id = ? AND status <> 'BATAL'
             ");
             $stmt->execute([$id]);
-            $scheduled = (float)$stmt->fetchColumn();
+            $scheduled = (float) $stmt->fetchColumn();
 
-            $remaining = max(0, (float)$purchase['total'] - $scheduled);
+            $remaining = max(0, (float) $purchase['total'] - $scheduled);
             if ($nominal > $remaining + 0.00001) {
                 throw new RuntimeException('Nominal melebihi sisa tagihan yang belum dijadwalkan (' . rupiah($remaining) . ').');
             }
@@ -494,7 +494,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 WHERE pembelian_alat_berat_id = ?
             ");
             $stmt->execute([$id]);
-            $termin = (int)$stmt->fetchColumn();
+            $termin = (int) $stmt->fetchColumn();
 
             $stmt = $pdo->prepare("
                 INSERT INTO pembelian_pembayaran
@@ -518,7 +518,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($action === 'generate_installments') {
             $jumlah = filter_var($_POST['jumlah_termin'] ?? null, FILTER_VALIDATE_INT);
-            $tanggalPertama = trim((string)($_POST['tanggal_termin_pertama'] ?? ''));
+            $tanggalPertama = trim((string) ($_POST['tanggal_termin_pertama'] ?? ''));
             $interval = filter_var($_POST['interval_hari'] ?? null, FILTER_VALIDATE_INT);
 
             if (!$jumlah || $jumlah < 1 || $jumlah > 60) {
@@ -544,7 +544,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!$purchase) {
                 throw new RuntimeException('Pembelian tidak ditemukan.');
             }
-            if (strtoupper((string)$purchase['status']) === 'BATAL') {
+            if (strtoupper((string) $purchase['status']) === 'BATAL') {
                 throw new RuntimeException('Pembelian BATAL tidak dapat dibuatkan termin.');
             }
             if ($tanggalPertama < $purchase['tanggal']) {
@@ -557,9 +557,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 WHERE pembelian_alat_berat_id = ? AND status <> 'BATAL'
             ");
             $stmt->execute([$id]);
-            $scheduled = (float)$stmt->fetchColumn();
+            $scheduled = (float) $stmt->fetchColumn();
 
-            $remaining = (float)$purchase['total'] - $scheduled;
+            $remaining = (float) $purchase['total'] - $scheduled;
             if ($remaining <= 0.00001) {
                 throw new RuntimeException('Tidak ada sisa tagihan untuk dibuatkan jadwal.');
             }
@@ -577,7 +577,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 WHERE pembelian_alat_berat_id = ?
             ");
             $stmt->execute([$id]);
-            $termin = (int)$stmt->fetchColumn();
+            $termin = (int) $stmt->fetchColumn();
 
             $insert = $pdo->prepare("
                 INSERT INTO pembelian_pembayaran
@@ -615,10 +615,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($action === 'mark_payment_paid') {
             $paymentId = filter_var($_POST['payment_id'] ?? null, FILTER_VALIDATE_INT);
-            $tanggalBayar = trim((string)($_POST['tanggal_bayar'] ?? date('Y-m-d')));
-            $metode = strtoupper(trim((string)($_POST['metode_pembayaran'] ?? '')));
-            $referensi = trim((string)($_POST['referensi'] ?? ''));
-            $keterangan = trim((string)($_POST['keterangan_pembayaran'] ?? ''));
+            $tanggalBayar = trim((string) ($_POST['tanggal_bayar'] ?? date('Y-m-d')));
+            $metode = strtoupper(trim((string) ($_POST['metode_pembayaran'] ?? '')));
+            $referensi = trim((string) ($_POST['referensi'] ?? ''));
+            $keterangan = trim((string) ($_POST['keterangan_pembayaran'] ?? ''));
 
             if (!$paymentId) {
                 throw new RuntimeException('Termin pembayaran tidak valid.');
@@ -648,10 +648,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!$payment) {
                 throw new RuntimeException('Termin pembayaran tidak ditemukan.');
             }
-            if (strtoupper((string)$payment['status_pembelian']) === 'BATAL') {
+            if (strtoupper((string) $payment['status_pembelian']) === 'BATAL') {
                 throw new RuntimeException('Pembelian BATAL tidak dapat menerima pembayaran.');
             }
-            if (strtoupper((string)$payment['status']) === 'PAID') {
+            if (strtoupper((string) $payment['status']) === 'PAID') {
                 throw new RuntimeException('Termin ini sudah PAID.');
             }
             if ($tanggalBayar < $payment['tanggal']) {
@@ -667,10 +667,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 FOR UPDATE
             ");
             $stmt->execute([$id, $paymentId]);
-            $alreadyPaid = (float)$stmt->fetchColumn();
+            $alreadyPaid = (float) $stmt->fetchColumn();
 
-            $amount = (float)$payment['nominal'];
-            $totalPurchase = (float)$payment['total_pembelian'];
+            $amount = (float) $payment['nominal'];
+            $totalPurchase = (float) $payment['total_pembelian'];
 
             if ($alreadyPaid + $amount > $totalPurchase + 0.00001) {
                 throw new RuntimeException('Pembayaran menyebabkan total pembayaran melebihi nilai pembelian.');
@@ -698,7 +698,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ");
             $stmt->execute();
             $kategoriId = $stmt->fetchColumn();
-            $kategoriId = $kategoriId !== false ? (int)$kategoriId : null;
+            $kategoriId = $kategoriId !== false ? (int) $kategoriId : null;
 
             $stmt = $pdo->prepare("
                 INSERT INTO pengeluaran
@@ -717,7 +717,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $metode,
                 $referensi !== '' ? $referensi : null,
                 $keterangan !== '' ? $keterangan : null,
-                (int)$_SESSION['admin_id']
+                (int) $_SESSION['admin_id']
             ]);
 
             $stmt = $pdo->prepare("
@@ -744,8 +744,183 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirectDetail(
                 $id,
                 'success',
-                'Termin ' . (int)$payment['termin_ke'] . ' sebesar ' .
+                'Termin ' . (int) $payment['termin_ke'] . ' sebesar ' .
                 rupiah($amount) . ' berhasil PAID dan otomatis dicatat sebagai Pengeluaran.'
+            );
+        }
+
+        if ($action === 'update_payment_plan') {
+            $paymentId = filter_var($_POST['payment_id'] ?? null, FILTER_VALIDATE_INT);
+            $paymentStatus = strtoupper(trim((string) ($_POST['payment_status'] ?? 'BELUM_BAYAR')));
+            $tanggalJatuhTempo = trim((string) ($_POST['tanggal_jatuh_tempo'] ?? ''));
+            $nominal = (float) ($_POST['nominal'] ?? 0);
+            $tanggalBayar = trim((string) ($_POST['tanggal_bayar'] ?? ''));
+            $metode = strtoupper(trim((string) ($_POST['metode_pembayaran'] ?? '')));
+            $referensi = trim((string) ($_POST['referensi'] ?? ''));
+            $keterangan = trim((string) ($_POST['keterangan_pembayaran'] ?? ''));
+
+            if (!$paymentId) {
+                throw new RuntimeException('Termin pembayaran tidak valid.');
+            }
+            if (!in_array($paymentStatus, ['PAID', 'BELUM_BAYAR'], true)) {
+                throw new RuntimeException('Status pembayaran tidak valid.');
+            }
+            if ($tanggalJatuhTempo === '') {
+                throw new RuntimeException('Tanggal jatuh tempo wajib diisi.');
+            }
+            if ($nominal <= 0) {
+                throw new RuntimeException('Nominal pembayaran harus lebih dari 0.');
+            }
+
+            $pdo->beginTransaction();
+
+            $stmt = $pdo->prepare("
+                SELECT pp.*, p.tanggal AS tanggal_pembelian, p.total AS total_pembelian,
+                       p.status AS status_pembelian
+                FROM pembelian_pembayaran pp
+                INNER JOIN pembelian_alat_berat p ON p.id = pp.pembelian_alat_berat_id
+                WHERE pp.id = ? AND pp.pembelian_alat_berat_id = ?
+                FOR UPDATE
+            ");
+            $stmt->execute([$paymentId, $id]);
+            $payment = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$payment) {
+                throw new RuntimeException('Termin pembayaran tidak ditemukan.');
+            }
+            if (strtoupper((string) $payment['status_pembelian']) === 'BATAL') {
+                throw new RuntimeException('Pembelian BATAL tidak dapat mengubah termin.');
+            }
+            if ($tanggalJatuhTempo < $payment['tanggal_pembelian']) {
+                throw new RuntimeException('Jatuh tempo tidak boleh sebelum tanggal pembelian.');
+            }
+            if ($paymentStatus === 'PAID') {
+                if ($tanggalBayar === '' || $metode === '') {
+                    throw new RuntimeException('Tanggal pembayaran dan metode pembayaran wajib diisi untuk status PAID.');
+                }
+                if ($tanggalBayar < $payment['tanggal_pembelian']) {
+                    throw new RuntimeException('Tanggal pembayaran tidak boleh sebelum tanggal pembelian.');
+                }
+            } else {
+                $tanggalBayar = '';
+                $metode = '';
+                $referensi = '';
+                $keterangan = '';
+            }
+
+            $stmt = $pdo->prepare("
+                SELECT COALESCE(SUM(nominal), 0)
+                FROM pembelian_pembayaran
+                WHERE pembelian_alat_berat_id = ?
+                  AND status <> 'BATAL'
+                  AND id <> ?
+            ");
+            $stmt->execute([$id, $paymentId]);
+            $otherScheduled = (float) $stmt->fetchColumn();
+            if ($otherScheduled + $nominal > (float) $payment['total_pembelian'] + 0.00001) {
+                throw new RuntimeException('Total termin aktif tidak boleh melebihi total pembelian.');
+            }
+
+            $stmt = $pdo->prepare("
+                SELECT COALESCE(SUM(nominal), 0)
+                FROM pembelian_pembayaran
+                WHERE pembelian_alat_berat_id = ?
+                  AND status = 'PAID'
+                  AND id <> ?
+            ");
+            $stmt->execute([$id, $paymentId]);
+            $otherPaid = (float) $stmt->fetchColumn();
+            if ($paymentStatus === 'PAID' && $otherPaid + $nominal > (float) $payment['total_pembelian'] + 0.00001) {
+                throw new RuntimeException('Total pembayaran PAID tidak boleh melebihi total pembelian.');
+            }
+
+            $stmt = $pdo->prepare("SELECT id FROM pengeluaran WHERE pembelian_pembayaran_id = ? LIMIT 1 FOR UPDATE");
+            $stmt->execute([$paymentId]);
+            $pengeluaranId = $stmt->fetchColumn();
+
+            if ($paymentStatus === 'PAID') {
+                if ($pengeluaranId) {
+                    $stmt = $pdo->prepare("
+                        UPDATE pengeluaran
+                        SET tanggal = ?, nominal = ?, metode_pembayaran = ?, referensi = ?,
+                            keterangan = ?
+                        WHERE id = ?
+                        LIMIT 1
+                    ");
+                    $stmt->execute([
+                        $tanggalBayar,
+                        $nominal,
+                        $metode,
+                        $referensi !== '' ? $referensi : null,
+                        $keterangan !== '' ? $keterangan : null,
+                        (int) $pengeluaranId
+                    ]);
+                } else {
+                    $nomorPengeluaran = generateNomorPengeluaran($pdo, $tanggalBayar);
+                    $stmt = $pdo->prepare("
+                        SELECT id FROM kategori_keuangan
+                        WHERE kode = 'PEMBELIAN' AND tipe = 'PENGELUARAN'
+                        LIMIT 1
+                    ");
+                    $stmt->execute();
+                    $kategoriId = $stmt->fetchColumn();
+                    $kategoriId = $kategoriId !== false ? (int) $kategoriId : null;
+
+                    $stmt = $pdo->prepare("
+                        INSERT INTO pengeluaran
+                            (nomor_pengeluaran, tanggal, sumber, pembelian_pembayaran_id,
+                             kategori_id, jenis_pengeluaran, nominal, metode_pembayaran,
+                             referensi, keterangan, created_by)
+                        VALUES (?, ?, 'PEMBELIAN', ?, ?, 'Pembayaran Pembelian Alat Berat',
+                                ?, ?, ?, ?, ?)
+                    ");
+                    $stmt->execute([
+                        $nomorPengeluaran,
+                        $tanggalBayar,
+                        $paymentId,
+                        $kategoriId,
+                        $nominal,
+                        $metode,
+                        $referensi !== '' ? $referensi : null,
+                        $keterangan !== '' ? $keterangan : null,
+                        (int) $_SESSION['admin_id']
+                    ]);
+                }
+            } elseif ($pengeluaranId) {
+                $stmt = $pdo->prepare("DELETE FROM pengeluaran WHERE id = ? LIMIT 1");
+                $stmt->execute([(int) $pengeluaranId]);
+            }
+
+            $stmt = $pdo->prepare("
+                UPDATE pembelian_pembayaran
+                SET status = ?,
+                    tanggal_jatuh_tempo = ?,
+                    nominal = ?,
+                    tanggal_bayar = ?,
+                    metode_pembayaran = ?,
+                    referensi = ?,
+                    keterangan = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND pembelian_alat_berat_id = ?
+                LIMIT 1
+            ");
+            $stmt->execute([
+                $paymentStatus,
+                $tanggalJatuhTempo,
+                $nominal,
+                $paymentStatus === 'PAID' ? $tanggalBayar : null,
+                $paymentStatus === 'PAID' ? $metode : null,
+                $paymentStatus === 'PAID' && $referensi !== '' ? $referensi : null,
+                $paymentStatus === 'PAID' && $keterangan !== '' ? $keterangan : null,
+                $paymentId,
+                $id
+            ]);
+
+            $pdo->commit();
+            redirectDetail(
+                $id,
+                'success',
+                'Termin ' . (int) $payment['termin_ke'] . ' berhasil diperbarui menjadi ' . $paymentStatus . '.'
             );
         }
 
@@ -770,7 +945,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!$payment) {
                 throw new RuntimeException('Termin pembayaran tidak ditemukan.');
             }
-            if (strtoupper((string)$payment['status']) === 'PAID') {
+            if (strtoupper((string) $payment['status']) === 'PAID') {
                 throw new RuntimeException('Termin yang sudah PAID tidak dapat dihapus.');
             }
 
@@ -782,7 +957,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if ($action === 'update_status') {
-            $status = strtoupper(trim((string)($_POST['status'] ?? 'PROSES')));
+            $status = strtoupper(trim((string) ($_POST['status'] ?? 'PROSES')));
 
             if (!in_array($status, ['PROSES', 'SELESAI', 'BATAL'], true)) {
                 throw new RuntimeException('Status pembelian tidak valid.');
@@ -809,7 +984,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     WHERE pembelian_alat_berat_id = ? AND status = 'PAID'
                 ");
                 $stmt->execute([$id]);
-                if ((float)$stmt->fetchColumn() > 0) {
+                if ((float) $stmt->fetchColumn() > 0) {
                     throw new RuntimeException('Pembelian yang sudah memiliki pembayaran PAID tidak dapat dibatalkan.');
                 }
 
@@ -819,7 +994,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     WHERE pembelian_alat_berat_id = ? AND status <> 'BATAL'
                 ");
                 $stmt->execute([$id]);
-                if ((int)$stmt->fetchColumn() > 0) {
+                if ((int) $stmt->fetchColumn() > 0) {
                     throw new RuntimeException('Hapus atau batalkan seluruh termin pembayaran sebelum membatalkan pembelian.');
                 }
             }
@@ -909,23 +1084,23 @@ $totalUnit = 0;
 $subtotalUnit = 0;
 foreach ($details as $d) {
     $totalUnit++;
-    $subtotalUnit += (float)$d['subtotal'];
+    $subtotalUnit += (float) $d['subtotal'];
 }
 
 $totalScheduled = 0;
 $totalPaid = 0;
 foreach ($payments as $p) {
-    if (strtoupper((string)$p['status']) !== 'BATAL') {
-        $totalScheduled += (float)$p['nominal'];
+    if (strtoupper((string) $p['status']) !== 'BATAL') {
+        $totalScheduled += (float) $p['nominal'];
     }
-    if (strtoupper((string)$p['status']) === 'PAID') {
-        $totalPaid += (float)$p['nominal'];
+    if (strtoupper((string) $p['status']) === 'PAID') {
+        $totalPaid += (float) $p['nominal'];
     }
 }
-$outstanding = max(0, (float)$purchase['total'] - $totalPaid);
-$unscheduled = max(0, (float)$purchase['total'] - $totalScheduled);
+$outstanding = max(0, (float) $purchase['total'] - $totalPaid);
+$unscheduled = max(0, (float) $purchase['total'] - $totalScheduled);
 
-$message = isset($_GET['msg']) ? trim((string)$_GET['msg']) : '';
+$message = isset($_GET['msg']) ? trim((string) $_GET['msg']) : '';
 $messageType = ($_GET['msg_type'] ?? '') === 'success' ? 'success' : 'error';
 
 $extraHead = <<<'HTML'
@@ -1119,6 +1294,8 @@ $extraHead = <<<'HTML'
     font-size: 10px;
     font-weight: 600;
 }
+
+.payment-paid-only.is-hidden { display: none; }
 
 /* ── Payment section ── */
 .payment-toolbar {
@@ -1577,24 +1754,32 @@ require __DIR__ . '/../includes/header.php';
             <span class="panel-subtitle">Header transaksi dan informasi supplier.</span>
         </div>
         <?php
-        $status = strtoupper((string)$purchase['status']);
+        $status = strtoupper((string) $purchase['status']);
         $statusClass = $status === 'SELESAI' ? 'badge-success' : ($status === 'BATAL' ? 'badge-danger' : 'badge-info');
         ?>
-        <span class="purchase-badge large-badge <?php echo $statusClass; ?>"><?php echo h($purchase['status']); ?></span>
+        <span
+            class="purchase-badge large-badge <?php echo $statusClass; ?>"><?php echo h($purchase['status']); ?></span>
     </div>
 
     <div class="info-grid">
         <div><span>Nomor Pembelian</span><strong><?php echo h($purchase['nomor_pembelian']); ?></strong></div>
         <div><span>Tanggal</span><strong><?php echo h(date('d-m-Y', strtotime($purchase['tanggal']))); ?></strong></div>
-        <div><span>Supplier</span><strong><?php echo h($purchase['supplier_kode'] . ' - ' . $purchase['supplier_nama']); ?></strong></div>
+        <div>
+            <span>Supplier</span><strong><?php echo h($purchase['supplier_kode'] . ' - ' . $purchase['supplier_nama']); ?></strong>
+        </div>
         <div><span>Telepon</span><strong><?php echo h($purchase['supplier_telepon'] ?: '-'); ?></strong></div>
-        <div><span>Estimasi Kedatangan</span><strong><?php echo $purchase['estimasi_kedatangan'] ? h(date('d-m-Y', strtotime($purchase['estimasi_kedatangan']))) : '-'; ?></strong></div>
-        <div><span>Kedatangan Aktual</span><strong><?php echo $purchase['kedatangan_aktual'] ? h(date('d-m-Y', strtotime($purchase['kedatangan_aktual']))) : '-'; ?></strong></div>
+        <div><span>Estimasi
+                Kedatangan</span><strong><?php echo $purchase['estimasi_kedatangan'] ? h(date('d-m-Y', strtotime($purchase['estimasi_kedatangan']))) : '-'; ?></strong>
+        </div>
+        <div><span>Kedatangan
+                Aktual</span><strong><?php echo $purchase['kedatangan_aktual'] ? h(date('d-m-Y', strtotime($purchase['kedatangan_aktual']))) : '-'; ?></strong>
+        </div>
         <div><span>Kurs Pembelian</span><strong><?php echo rupiah($purchase['kurs_pembelian']); ?> / USD</strong></div>
         <div><span>Bea Cukai</span><strong><?php echo rupiah($purchase['biaya_bea_cukai']); ?></strong></div>
         <div><span>Pengiriman</span><strong><?php echo rupiah($purchase['biaya_pengiriman']); ?></strong></div>
         <div><span>Biaya Lain</span><strong><?php echo rupiah($purchase['biaya_lain']); ?></strong></div>
-        <div class="info-full"><span>Keterangan</span><strong><?php echo nl2br(h($purchase['keterangan'] ?: '-')); ?></strong></div>
+        <div class="info-full">
+            <span>Keterangan</span><strong><?php echo nl2br(h($purchase['keterangan'] ?: '-')); ?></strong></div>
     </div>
 </section>
 
@@ -1602,7 +1787,8 @@ require __DIR__ . '/../includes/header.php';
     <div class="panel-heading">
         <div>
             <h2>Unit Alat Berat</h2>
-            <span class="panel-subtitle"><?php echo number_format($totalUnit, 0, ',', '.'); ?> unit · Subtotal unit <?php echo rupiah($subtotalUnit); ?></span>
+            <span class="panel-subtitle"><?php echo number_format($totalUnit, 0, ',', '.'); ?> unit · Subtotal unit
+                <?php echo rupiah($subtotalUnit); ?></span>
         </div>
         <button type="button" class="btn-primary" id="openUnitModal">+ Tambah Unit</button>
     </div>
@@ -1623,36 +1809,38 @@ require __DIR__ . '/../includes/header.php';
                 </tr>
             </thead>
             <tbody>
-            <?php if (empty($details)): ?>
-                <tr><td colspan="9" class="empty-state">Belum ada unit pada pembelian ini.</td></tr>
-            <?php else: ?>
-                <?php foreach ($details as $i => $detail): ?>
+                <?php if (empty($details)): ?>
                     <tr>
-                        <td><?php echo $i + 1; ?></td>
-                        <td><strong><?php echo h($detail['kode']); ?></strong></td>
-                        <td><?php echo h($detail['tipe']); ?></td>
-                        <td><?php echo h($detail['nomor_rangka'] ?: '-'); ?></td>
-                        <td><?php echo h($detail['tahun_pembuatan'] ?: '-'); ?></td>
-                        <td class="money-cell"><?php echo rupiah($detail['harga_beli']); ?></td>
-                        <td class="money-cell"><?php echo number_format((float)$detail['harga_usd'], 2, ',', '.'); ?></td>
-                        <td class="money-cell"><?php echo rupiah($detail['subtotal']); ?></td>
-                        <td class="action-cell">
-                            <button type="button" class="btn-small edit-unit"
-                                data-id="<?php echo (int)$detail['id']; ?>"
-                                data-unit="<?php echo (int)$detail['alat_berat_id']; ?>"
-                                data-harga="<?php echo h($detail['harga_beli']); ?>"
-                                data-usd="<?php echo h($detail['harga_usd']); ?>"
-                                data-keterangan="<?php echo h($detail['keterangan']); ?>">Edit</button>
-                            <form method="post" class="inline-form" onsubmit="return confirm('Hapus unit <?php echo h($detail['kode']); ?> dari pembelian ini?');">
-                                <input type="hidden" name="action" value="delete_unit">
-                                <input type="hidden" name="pembelian_id" value="<?php echo (int)$id; ?>">
-                                <input type="hidden" name="detail_id" value="<?php echo (int)$detail['id']; ?>">
-                                <button type="submit" class="btn-small danger-button">Hapus</button>
-                            </form>
-                        </td>
+                        <td colspan="9" class="empty-state">Belum ada unit pada pembelian ini.</td>
                     </tr>
-                <?php endforeach; ?>
-            <?php endif; ?>
+                <?php else: ?>
+                    <?php foreach ($details as $i => $detail): ?>
+                        <tr>
+                            <td><?php echo $i + 1; ?></td>
+                            <td><strong><?php echo h($detail['kode']); ?></strong></td>
+                            <td><?php echo h($detail['tipe']); ?></td>
+                            <td><?php echo h($detail['nomor_rangka'] ?: '-'); ?></td>
+                            <td><?php echo h($detail['tahun_pembuatan'] ?: '-'); ?></td>
+                            <td class="money-cell"><?php echo rupiah($detail['harga_beli']); ?></td>
+                            <td class="money-cell"><?php echo number_format((float) $detail['harga_usd'], 2, ',', '.'); ?></td>
+                            <td class="money-cell"><?php echo rupiah($detail['subtotal']); ?></td>
+                            <td class="action-cell">
+                                <button type="button" class="btn-small edit-unit" data-id="<?php echo (int) $detail['id']; ?>"
+                                    data-unit="<?php echo (int) $detail['alat_berat_id']; ?>"
+                                    data-harga="<?php echo h($detail['harga_beli']); ?>"
+                                    data-usd="<?php echo h($detail['harga_usd']); ?>"
+                                    data-keterangan="<?php echo h($detail['keterangan']); ?>">Edit</button>
+                                <form method="post" class="inline-form"
+                                    onsubmit="return confirm('Hapus unit <?php echo h($detail['kode']); ?> dari pembelian ini?');">
+                                    <input type="hidden" name="action" value="delete_unit">
+                                    <input type="hidden" name="pembelian_id" value="<?php echo (int) $id; ?>">
+                                    <input type="hidden" name="detail_id" value="<?php echo (int) $detail['id']; ?>">
+                                    <button type="submit" class="btn-small danger-button">Hapus</button>
+                                </form>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
             </tbody>
             <tfoot>
                 <tr>
@@ -1700,43 +1888,55 @@ require __DIR__ . '/../includes/header.php';
                 </tr>
             </thead>
             <tbody>
-            <?php if (empty($payments)): ?>
-                <tr><td colspan="9" class="empty-state">Belum ada rencana pembayaran.</td></tr>
-            <?php else: ?>
-                <?php foreach ($payments as $payment): ?>
-                    <?php
-                    $ps = strtoupper((string)$payment['status']);
-                    $displayStatus = strtoupper((string)$payment['status_tampilan']);
-                    $pc = $ps === 'PAID' ? 'badge-success' : ($displayStatus === 'JATUH TEMPO' ? 'badge-warning' : 'badge-info');
-                    ?>
+                <?php if (empty($payments)): ?>
                     <tr>
-                        <td><strong>Termin <?php echo (int)$payment['termin_ke']; ?></strong></td>
-                        <td><?php echo h($payment['jenis_pembayaran']); ?></td>
-                        <td><?php echo h(date('d-m-Y', strtotime($payment['tanggal_jatuh_tempo']))); ?></td>
-                        <td class="money-cell"><?php echo rupiah($payment['nominal']); ?></td>
-                        <td><span class="purchase-badge <?php echo $pc; ?>"><?php echo h($displayStatus); ?></span></td>
-                        <td><?php echo $payment['tanggal_bayar'] ? h(date('d-m-Y', strtotime($payment['tanggal_bayar']))) : '-'; ?></td>
-                        <td><?php echo h($payment['metode_pembayaran'] ?: '-'); ?></td>
-                        <td><?php echo h($payment['nomor_pengeluaran'] ?: '-'); ?></td>
-                        <td class="action-cell">
-                            <?php if ($ps !== 'PAID'): ?>
-                                <button type="button" class="btn-small paid-button"
-                                    data-id="<?php echo (int)$payment['id']; ?>"
-                                    data-termin="<?php echo (int)$payment['termin_ke']; ?>"
-                                    data-nominal="<?php echo h($payment['nominal']); ?>">Tandai PAID</button>
-                                <form method="post" class="inline-form" onsubmit="return confirm('Hapus termin ini?');">
-                                    <input type="hidden" name="action" value="delete_payment_plan">
-                                    <input type="hidden" name="pembelian_id" value="<?php echo (int)$id; ?>">
-                                    <input type="hidden" name="payment_id" value="<?php echo (int)$payment['id']; ?>">
-                                    <button type="submit" class="btn-small danger-button">Hapus</button>
-                                </form>
-                            <?php else: ?>
-                                <span class="paid-note">Sudah dicatat</span>
-                            <?php endif; ?>
-                        </td>
+                        <td colspan="9" class="empty-state">Belum ada rencana pembayaran.</td>
                     </tr>
-                <?php endforeach; ?>
-            <?php endif; ?>
+                <?php else: ?>
+                    <?php foreach ($payments as $payment): ?>
+                        <?php
+                        $ps = strtoupper((string) $payment['status']);
+                        $displayStatus = strtoupper((string) $payment['status_tampilan']);
+                        $pc = $ps === 'PAID' ? 'badge-success' : ($displayStatus === 'JATUH TEMPO' ? 'badge-warning' : 'badge-info');
+                        ?>
+                        <tr>
+                            <td><strong>Termin <?php echo (int) $payment['termin_ke']; ?></strong></td>
+                            <td><?php echo h($payment['jenis_pembayaran']); ?></td>
+                            <td><?php echo h(date('d-m-Y', strtotime($payment['tanggal_jatuh_tempo']))); ?></td>
+                            <td class="money-cell"><?php echo rupiah($payment['nominal']); ?></td>
+                            <td><span class="purchase-badge <?php echo $pc; ?>"><?php echo h($displayStatus); ?></span></td>
+                            <td><?php echo $payment['tanggal_bayar'] ? h(date('d-m-Y', strtotime($payment['tanggal_bayar']))) : '-'; ?>
+                            </td>
+                            <td><?php echo h($payment['metode_pembayaran'] ?: '-'); ?></td>
+                            <td><?php echo h($payment['nomor_pengeluaran'] ?: '-'); ?></td>
+                            <td class="action-cell">
+                                <button type="button" class="btn-small edit-payment"
+                                    data-id="<?php echo (int) $payment['id']; ?>"
+                                    data-termin="<?php echo (int) $payment['termin_ke']; ?>"
+                                    data-status="<?php echo h($ps === 'PAID' ? 'PAID' : 'BELUM_BAYAR'); ?>"
+                                    data-jatuh-tempo="<?php echo h($payment['tanggal_jatuh_tempo']); ?>"
+                                    data-nominal="<?php echo h($payment['nominal']); ?>"
+                                    data-tanggal-bayar="<?php echo h($payment['tanggal_bayar'] ?? ''); ?>"
+                                    data-metode="<?php echo h($payment['metode_pembayaran'] ?? ''); ?>"
+                                    data-referensi="<?php echo h($payment['referensi'] ?? ''); ?>"
+                                    data-keterangan="<?php echo h($payment['keterangan'] ?? ''); ?>">Edit</button>
+                                <?php if ($ps !== 'PAID'): ?>
+                                    <button type="button" class="btn-small paid-button" data-id="<?php echo (int) $payment['id']; ?>"
+                                        data-termin="<?php echo (int) $payment['termin_ke']; ?>"
+                                        data-nominal="<?php echo h($payment['nominal']); ?>">Tandai PAID</button>
+                                    <form method="post" class="inline-form" onsubmit="return confirm('Hapus termin ini?');">
+                                        <input type="hidden" name="action" value="delete_payment_plan">
+                                        <input type="hidden" name="pembelian_id" value="<?php echo (int) $id; ?>">
+                                        <input type="hidden" name="payment_id" value="<?php echo (int) $payment['id']; ?>">
+                                        <button type="submit" class="btn-small danger-button">Hapus</button>
+                                    </form>
+                                <?php else: ?>
+                                    <span class="paid-note">Sudah dicatat</span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
             </tbody>
         </table>
     </div>
@@ -1752,7 +1952,7 @@ require __DIR__ . '/../includes/header.php';
     <div class="status-area">
         <form method="post" class="status-form">
             <input type="hidden" name="action" value="update_status">
-            <input type="hidden" name="pembelian_id" value="<?php echo (int)$id; ?>">
+            <input type="hidden" name="pembelian_id" value="<?php echo (int) $id; ?>">
             <select name="status" class="status-select">
                 <option value="PROSES" <?php echo $status === 'PROSES' ? 'selected' : ''; ?>>PROSES</option>
                 <option value="SELESAI" <?php echo $status === 'SELESAI' ? 'selected' : ''; ?>>SELESAI</option>
@@ -1767,109 +1967,247 @@ require __DIR__ . '/../includes/header.php';
 <div class="purchase-modal" id="headerModal" aria-hidden="true">
     <div class="purchase-modal-box purchase-modal-large">
         <div class="purchase-modal-header">
-            <div><h3>Edit Informasi Pembelian</h3><p><?php echo h($purchase['nomor_pembelian']); ?></p></div>
+            <div>
+                <h3>Edit Informasi Pembelian</h3>
+                <p><?php echo h($purchase['nomor_pembelian']); ?></p>
+            </div>
             <button type="button" class="purchase-modal-close" data-close-modal="headerModal">&times;</button>
         </div>
         <form method="post">
             <input type="hidden" name="action" value="update_header">
-            <input type="hidden" name="pembelian_id" value="<?php echo (int)$id; ?>">
+            <input type="hidden" name="pembelian_id" value="<?php echo (int) $id; ?>">
             <div class="purchase-modal-body">
                 <div class="purchase-form-grid">
-                    <div class="purchase-field"><label>Nomor Pembelian <span>*</span></label><input type="text" name="nomor_pembelian" maxlength="50" value="<?php echo h($purchase['nomor_pembelian']); ?>" required></div>
-                    <div class="purchase-field"><label>Tanggal <span>*</span></label><input type="date" name="tanggal" value="<?php echo h($purchase['tanggal']); ?>" required></div>
-                    <div class="purchase-field purchase-field-full"><label>Supplier <span>*</span></label><select name="supplier_id" required>
-                        <?php foreach ($suppliers as $supplier): ?>
-                            <option value="<?php echo (int)$supplier['id']; ?>" <?php echo (int)$supplier['id'] === (int)$purchase['supplier_id'] ? 'selected' : ''; ?>><?php echo h($supplier['kode'] . ' - ' . $supplier['nama']); ?></option>
-                        <?php endforeach; ?>
-                    </select></div>
-                    <div class="purchase-field"><label>Estimasi Kedatangan</label><input type="date" name="estimasi_kedatangan" value="<?php echo h($purchase['estimasi_kedatangan']); ?>"></div>
-                    <div class="purchase-field"><label>Kedatangan Aktual</label><input type="date" name="kedatangan_aktual" value="<?php echo h($purchase['kedatangan_aktual']); ?>"></div>
-                    <div class="purchase-field"><label>Kurs Pembelian</label><input type="number" name="kurs_pembelian" min="0" step="0.01" value="<?php echo h($purchase['kurs_pembelian']); ?>"></div>
-                    <div class="purchase-field"><label>Bea Cukai</label><input type="number" name="biaya_bea_cukai" min="0" step="0.01" value="<?php echo h($purchase['biaya_bea_cukai']); ?>"></div>
-                    <div class="purchase-field"><label>Biaya Pengiriman</label><input type="number" name="biaya_pengiriman" min="0" step="0.01" value="<?php echo h($purchase['biaya_pengiriman']); ?>"></div>
-                    <div class="purchase-field"><label>Biaya Lain</label><input type="number" name="biaya_lain" min="0" step="0.01" value="<?php echo h($purchase['biaya_lain']); ?>"></div>
-                    <div class="purchase-field purchase-field-full"><label>Keterangan</label><textarea name="keterangan" rows="3"><?php echo h($purchase['keterangan']); ?></textarea></div>
+                    <div class="purchase-field"><label>Nomor Pembelian <span>*</span></label><input type="text"
+                            name="nomor_pembelian" maxlength="50" value="<?php echo h($purchase['nomor_pembelian']); ?>"
+                            required></div>
+                    <div class="purchase-field"><label>Tanggal <span>*</span></label><input type="date" name="tanggal"
+                            value="<?php echo h($purchase['tanggal']); ?>" required></div>
+                    <div class="purchase-field purchase-field-full"><label>Supplier <span>*</span></label><select
+                            name="supplier_id" required>
+                            <?php foreach ($suppliers as $supplier): ?>
+                                <option value="<?php echo (int) $supplier['id']; ?>" <?php echo (int) $supplier['id'] === (int) $purchase['supplier_id'] ? 'selected' : ''; ?>>
+                                    <?php echo h($supplier['kode'] . ' - ' . $supplier['nama']); ?></option>
+                            <?php endforeach; ?>
+                        </select></div>
+                    <div class="purchase-field"><label>Estimasi Kedatangan</label><input type="date"
+                            name="estimasi_kedatangan" value="<?php echo h($purchase['estimasi_kedatangan']); ?>"></div>
+                    <div class="purchase-field"><label>Kedatangan Aktual</label><input type="date"
+                            name="kedatangan_aktual" value="<?php echo h($purchase['kedatangan_aktual']); ?>"></div>
+                    <div class="purchase-field"><label>Kurs Pembelian</label><input type="number" name="kurs_pembelian"
+                            min="0" step="0.01" value="<?php echo h($purchase['kurs_pembelian']); ?>"></div>
+                    <div class="purchase-field"><label>Bea Cukai</label><input type="number" name="biaya_bea_cukai"
+                            min="0" step="0.01" value="<?php echo h($purchase['biaya_bea_cukai']); ?>"></div>
+                    <div class="purchase-field"><label>Biaya Pengiriman</label><input type="number"
+                            name="biaya_pengiriman" min="0" step="0.01"
+                            value="<?php echo h($purchase['biaya_pengiriman']); ?>"></div>
+                    <div class="purchase-field"><label>Biaya Lain</label><input type="number" name="biaya_lain" min="0"
+                            step="0.01" value="<?php echo h($purchase['biaya_lain']); ?>"></div>
+                    <div class="purchase-field purchase-field-full"><label>Keterangan</label><textarea name="keterangan"
+                            rows="3"><?php echo h($purchase['keterangan']); ?></textarea></div>
                 </div>
             </div>
-            <div class="purchase-modal-footer"><button type="button" class="btn-secondary" data-close-modal="headerModal">Batal</button><button type="submit" class="btn-primary">Simpan Perubahan</button></div>
+            <div class="purchase-modal-footer"><button type="button" class="btn-secondary"
+                    data-close-modal="headerModal">Batal</button><button type="submit" class="btn-primary">Simpan
+                    Perubahan</button></div>
         </form>
     </div>
 </div>
 
 <div class="purchase-modal" id="unitModal" aria-hidden="true">
     <div class="purchase-modal-box">
-        <div class="purchase-modal-header"><div><h3 id="unitModalTitle">Tambah Unit</h3><p>Harga unit menjadi bagian dari total pembelian.</p></div><button type="button" class="purchase-modal-close" data-close-modal="unitModal">&times;</button></div>
+        <div class="purchase-modal-header">
+            <div>
+                <h3 id="unitModalTitle">Tambah Unit</h3>
+                <p>Harga unit menjadi bagian dari total pembelian.</p>
+            </div><button type="button" class="purchase-modal-close" data-close-modal="unitModal">&times;</button>
+        </div>
         <form method="post" id="unitForm">
             <input type="hidden" name="action" id="unitAction" value="add_unit">
-            <input type="hidden" name="pembelian_id" value="<?php echo (int)$id; ?>">
+            <input type="hidden" name="pembelian_id" value="<?php echo (int) $id; ?>">
             <input type="hidden" name="detail_id" id="unitDetailId" value="">
             <div class="purchase-modal-body">
                 <div class="purchase-form-grid">
-                    <div class="purchase-field purchase-field-full"><label>Unit Alat Berat <span>*</span></label><select name="alat_berat_id" id="unitSelect" required>
-                        <option value="">-- Pilih Unit --</option>
-                        <?php foreach ($units as $unit): ?>
-                            <option value="<?php echo (int)$unit['id']; ?>"><?php echo h($unit['kode'] . ' - ' . $unit['tipe'] . ' - ' . ($unit['nomor_rangka'] ?: 'Tanpa nomor rangka')); ?></option>
-                        <?php endforeach; ?>
-                    </select></div>
-                    <div class="purchase-field"><label>Harga Beli (IDR) <span>*</span></label><input type="number" name="harga_beli" id="unitHarga" min="0" step="0.01" value="0" required></div>
-                    <div class="purchase-field"><label>Harga Beli (USD)</label><input type="number" name="harga_usd" id="unitUsd" min="0" step="0.01" value="0"></div>
-                    <div class="purchase-field purchase-field-full"><label>Keterangan</label><textarea name="detail_keterangan" id="unitKeterangan" rows="3"></textarea></div>
+                    <div class="purchase-field purchase-field-full"><label>Unit Alat Berat <span>*</span></label><select
+                            name="alat_berat_id" id="unitSelect" required>
+                            <option value="">-- Pilih Unit --</option>
+                            <?php foreach ($units as $unit): ?>
+                                <option value="<?php echo (int) $unit['id']; ?>">
+                                    <?php echo h($unit['kode'] . ' - ' . $unit['tipe'] . ' - ' . ($unit['nomor_rangka'] ?: 'Tanpa nomor rangka')); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select></div>
+                    <div class="purchase-field"><label>Harga Beli (IDR) <span>*</span></label><input type="number"
+                            name="harga_beli" id="unitHarga" min="0" step="0.01" value="0" required></div>
+                    <div class="purchase-field"><label>Harga Beli (USD)</label><input type="number" name="harga_usd"
+                            id="unitUsd" min="0" step="0.01" value="0"></div>
+                    <div class="purchase-field purchase-field-full"><label>Keterangan</label><textarea
+                            name="detail_keterangan" id="unitKeterangan" rows="3"></textarea></div>
                 </div>
             </div>
-            <div class="purchase-modal-footer"><button type="button" class="btn-secondary" data-close-modal="unitModal">Batal</button><button type="submit" class="btn-primary" id="unitSubmit">Simpan Unit</button></div>
+            <div class="purchase-modal-footer"><button type="button" class="btn-secondary"
+                    data-close-modal="unitModal">Batal</button><button type="submit" class="btn-primary"
+                    id="unitSubmit">Simpan Unit</button></div>
         </form>
     </div>
 </div>
 
 <div class="purchase-modal" id="paymentModal" aria-hidden="true">
     <div class="purchase-modal-box">
-        <div class="purchase-modal-header"><div><h3>Tambah Termin Pembayaran</h3><p>Sisa yang belum dijadwalkan: <?php echo rupiah($unscheduled); ?></p></div><button type="button" class="purchase-modal-close" data-close-modal="paymentModal">&times;</button></div>
+        <div class="purchase-modal-header">
+            <div>
+                <h3>Tambah Termin Pembayaran</h3>
+                <p>Sisa yang belum dijadwalkan: <?php echo rupiah($unscheduled); ?></p>
+            </div><button type="button" class="purchase-modal-close" data-close-modal="paymentModal">&times;</button>
+        </div>
         <form method="post">
-            <input type="hidden" name="action" value="add_payment_plan"><input type="hidden" name="pembelian_id" value="<?php echo (int)$id; ?>">
+            <input type="hidden" name="action" value="add_payment_plan"><input type="hidden" name="pembelian_id"
+                value="<?php echo (int) $id; ?>">
             <div class="purchase-modal-body">
                 <div class="purchase-form-grid">
-                    <div class="purchase-field"><label>Jenis Pembayaran <span>*</span></label><select name="jenis_pembayaran" required><option value="DP">DP</option><option value="CICILAN">CICILAN</option><option value="PELUNASAN">PELUNASAN</option><option value="LAINNYA">LAINNYA</option></select></div>
-                    <div class="purchase-field"><label>Jatuh Tempo <span>*</span></label><input type="date" name="tanggal_jatuh_tempo" value="<?php echo h(date('Y-m-d')); ?>" min="<?php echo h($purchase['tanggal']); ?>" required></div>
-                    <div class="purchase-field purchase-field-full"><label>Nominal <span>*</span></label><input type="number" name="nominal" min="0.01" step="0.01" max="<?php echo h($unscheduled); ?>" value="<?php echo h($unscheduled); ?>" required></div>
+                    <div class="purchase-field"><label>Jenis Pembayaran <span>*</span></label><select
+                            name="jenis_pembayaran" required>
+                            <option value="DP">DP</option>
+                            <option value="CICILAN">CICILAN</option>
+                            <option value="PELUNASAN">PELUNASAN</option>
+                            <option value="LAINNYA">LAINNYA</option>
+                        </select></div>
+                    <div class="purchase-field"><label>Jatuh Tempo <span>*</span></label><input type="date"
+                            name="tanggal_jatuh_tempo" value="<?php echo h(date('Y-m-d')); ?>"
+                            min="<?php echo h($purchase['tanggal']); ?>" required></div>
+                    <div class="purchase-field purchase-field-full"><label>Nominal <span>*</span></label><input
+                            type="number" name="nominal" min="0.01" step="0.01" max="<?php echo h($unscheduled); ?>"
+                            value="<?php echo h($unscheduled); ?>" required></div>
                 </div>
             </div>
-            <div class="purchase-modal-footer"><button type="button" class="btn-secondary" data-close-modal="paymentModal">Batal</button><button type="submit" class="btn-primary">Tambah Termin</button></div>
+            <div class="purchase-modal-footer"><button type="button" class="btn-secondary"
+                    data-close-modal="paymentModal">Batal</button><button type="submit" class="btn-primary">Tambah
+                    Termin</button></div>
         </form>
     </div>
 </div>
 
 <div class="purchase-modal" id="generateModal" aria-hidden="true">
     <div class="purchase-modal-box">
-        <div class="purchase-modal-header"><div><h3>Generate Cicilan</h3><p>Sisa yang belum dijadwalkan: <?php echo rupiah($unscheduled); ?></p></div><button type="button" class="purchase-modal-close" data-close-modal="generateModal">&times;</button></div>
+        <div class="purchase-modal-header">
+            <div>
+                <h3>Generate Cicilan</h3>
+                <p>Sisa yang belum dijadwalkan: <?php echo rupiah($unscheduled); ?></p>
+            </div><button type="button" class="purchase-modal-close" data-close-modal="generateModal">&times;</button>
+        </div>
         <form method="post">
-            <input type="hidden" name="action" value="generate_installments"><input type="hidden" name="pembelian_id" value="<?php echo (int)$id; ?>">
+            <input type="hidden" name="action" value="generate_installments"><input type="hidden" name="pembelian_id"
+                value="<?php echo (int) $id; ?>">
             <div class="purchase-modal-body">
                 <div class="purchase-form-grid">
-                    <div class="purchase-field"><label>Jumlah Termin <span>*</span></label><input type="number" name="jumlah_termin" min="1" max="60" value="3" required></div>
-                    <div class="purchase-field"><label>Termin Pertama <span>*</span></label><input type="date" name="tanggal_termin_pertama" value="<?php echo h(date('Y-m-d')); ?>" min="<?php echo h($purchase['tanggal']); ?>" required></div>
-                    <div class="purchase-field purchase-field-full"><label>Interval Antar Termin (hari) <span>*</span></label><input type="number" name="interval_hari" min="0" max="3650" value="30" required><small class="form-help">Contoh 30 = setiap 30 hari. Nominal termin terakhir disesuaikan agar total tepat.</small></div>
+                    <div class="purchase-field"><label>Jumlah Termin <span>*</span></label><input type="number"
+                            name="jumlah_termin" min="1" max="60" value="3" required></div>
+                    <div class="purchase-field"><label>Termin Pertama <span>*</span></label><input type="date"
+                            name="tanggal_termin_pertama" value="<?php echo h(date('Y-m-d')); ?>"
+                            min="<?php echo h($purchase['tanggal']); ?>" required></div>
+                    <div class="purchase-field purchase-field-full"><label>Interval Antar Termin (hari)
+                            <span>*</span></label><input type="number" name="interval_hari" min="0" max="3650"
+                            value="30" required><small class="form-help">Contoh 30 = setiap 30 hari. Nominal termin
+                            terakhir disesuaikan agar total tepat.</small></div>
                 </div>
             </div>
-            <div class="purchase-modal-footer"><button type="button" class="btn-secondary" data-close-modal="generateModal">Batal</button><button type="submit" class="btn-primary">Generate Jadwal</button></div>
+            <div class="purchase-modal-footer"><button type="button" class="btn-secondary"
+                    data-close-modal="generateModal">Batal</button><button type="submit" class="btn-primary">Generate
+                    Jadwal</button></div>
+        </form>
+    </div>
+</div>
+
+<div class="purchase-modal" id="editPaymentModal" aria-hidden="true">
+    <div class="purchase-modal-box">
+        <div class="purchase-modal-header">
+            <div>
+                <h3>Edit Termin Pembayaran</h3>
+                <p id="editPaymentSubtitle"></p>
+            </div>
+            <button type="button" class="purchase-modal-close" data-close-modal="editPaymentModal">&times;</button>
+        </div>
+        <form method="post" id="editPaymentForm">
+            <input type="hidden" name="action" value="update_payment_plan">
+            <input type="hidden" name="pembelian_id" value="<?php echo (int) $id; ?>">
+            <input type="hidden" name="payment_id" id="editPaymentId">
+            <div class="purchase-modal-body">
+                <div class="purchase-form-grid">
+                    <div class="purchase-field"><label>Status Pembayaran <span>*</span></label>
+                        <select name="payment_status" id="editPaymentStatus" required>
+                            <option value="BELUM_BAYAR">BELUM BAYAR</option>
+                            <option value="PAID">PAID</option>
+                        </select>
+                    </div>
+                    <div class="purchase-field"><label>Jatuh Tempo <span>*</span></label><input type="date"
+                            name="tanggal_jatuh_tempo" id="editPaymentDue" min="<?php echo h($purchase['tanggal']); ?>"
+                            required></div>
+                    <div class="purchase-field purchase-field-full"><label>Nominal <span>*</span></label><input
+                            type="number" name="nominal" id="editPaymentNominal" min="0.01" step="0.01" required></div>
+                    <div class="purchase-field payment-paid-only"><label>Tanggal Pembayaran <span>*</span></label><input
+                            type="date" name="tanggal_bayar" id="editPaymentDate"
+                            min="<?php echo h($purchase['tanggal']); ?>"></div>
+                    <div class="purchase-field payment-paid-only"><label>Metode Pembayaran <span>*</span></label>
+                        <select name="metode_pembayaran" id="editPaymentMethod">
+                            <option value="">-- Pilih --</option>
+                            <option value="TRANSFER">TRANSFER</option>
+                            <option value="CASH">CASH</option>
+                            <option value="GIRO">GIRO</option>
+                            <option value="CEK">CEK</option>
+                            <option value="LAINNYA">LAINNYA</option>
+                        </select>
+                    </div>
+                    <div class="purchase-field purchase-field-full payment-paid-only"><label>Referensi</label><input
+                            type="text" name="referensi" id="editPaymentReference" maxlength="100"></div>
+                    <div class="purchase-field purchase-field-full payment-paid-only"><label>Keterangan</label><textarea
+                            name="keterangan_pembayaran" id="editPaymentNote" rows="3"></textarea></div>
+                </div>
+                <small class="form-help">Mengubah PAID menjadi BELUM BAYAR akan menghapus transaksi Pengeluaran yang
+                    terkait dengan termin tersebut. Mengubah BELUM BAYAR menjadi PAID akan membuat atau memperbarui
+                    Pengeluaran otomatis.</small>
+            </div>
+            <div class="purchase-modal-footer"><button type="button" class="btn-secondary"
+                    data-close-modal="editPaymentModal">Batal</button><button type="submit" class="btn-primary">Simpan
+                    Perubahan</button></div>
         </form>
     </div>
 </div>
 
 <div class="purchase-modal" id="paidModal" aria-hidden="true">
     <div class="purchase-modal-box">
-        <div class="purchase-modal-header"><div><h3>Tandai Pembayaran PAID</h3><p id="paidSubtitle"></p></div><button type="button" class="purchase-modal-close" data-close-modal="paidModal">&times;</button></div>
+        <div class="purchase-modal-header">
+            <div>
+                <h3>Tandai Pembayaran PAID</h3>
+                <p id="paidSubtitle"></p>
+            </div><button type="button" class="purchase-modal-close" data-close-modal="paidModal">&times;</button>
+        </div>
         <form method="post">
-            <input type="hidden" name="action" value="mark_payment_paid"><input type="hidden" name="pembelian_id" value="<?php echo (int)$id; ?>"><input type="hidden" name="payment_id" id="paidPaymentId">
+            <input type="hidden" name="action" value="mark_payment_paid"><input type="hidden" name="pembelian_id"
+                value="<?php echo (int) $id; ?>"><input type="hidden" name="payment_id" id="paidPaymentId">
             <div class="purchase-modal-body">
-                <div class="payment-confirm-box"><span>Nominal dibayar</span><strong id="paidNominal">Rp 0</strong></div>
+                <div class="payment-confirm-box"><span>Nominal dibayar</span><strong id="paidNominal">Rp 0</strong>
+                </div>
                 <div class="purchase-form-grid">
-                    <div class="purchase-field"><label>Tanggal Pembayaran <span>*</span></label><input type="date" name="tanggal_bayar" value="<?php echo h(date('Y-m-d')); ?>" required></div>
-                    <div class="purchase-field"><label>Metode Pembayaran <span>*</span></label><select name="metode_pembayaran" required><option value="">-- Pilih --</option><option value="TRANSFER">TRANSFER</option><option value="CASH">CASH</option><option value="GIRO">GIRO</option><option value="CEK">CEK</option><option value="LAINNYA">LAINNYA</option></select></div>
-                    <div class="purchase-field purchase-field-full"><label>Referensi</label><input type="text" name="referensi" maxlength="100" placeholder="Nomor transfer / bukti pembayaran"></div>
-                    <div class="purchase-field purchase-field-full"><label>Keterangan</label><textarea name="keterangan_pembayaran" rows="3"></textarea></div>
+                    <div class="purchase-field"><label>Tanggal Pembayaran <span>*</span></label><input type="date"
+                            name="tanggal_bayar" value="<?php echo h(date('Y-m-d')); ?>" required></div>
+                    <div class="purchase-field"><label>Metode Pembayaran <span>*</span></label><select
+                            name="metode_pembayaran" required>
+                            <option value="">-- Pilih --</option>
+                            <option value="TRANSFER">TRANSFER</option>
+                            <option value="CASH">CASH</option>
+                            <option value="GIRO">GIRO</option>
+                            <option value="CEK">CEK</option>
+                            <option value="LAINNYA">LAINNYA</option>
+                        </select></div>
+                    <div class="purchase-field purchase-field-full"><label>Referensi</label><input type="text"
+                            name="referensi" maxlength="100" placeholder="Nomor transfer / bukti pembayaran"></div>
+                    <div class="purchase-field purchase-field-full"><label>Keterangan</label><textarea
+                            name="keterangan_pembayaran" rows="3"></textarea></div>
                 </div>
             </div>
-            <div class="purchase-modal-footer"><button type="button" class="btn-secondary" data-close-modal="paidModal">Batal</button><button type="submit" class="btn-primary">Simpan PAID</button></div>
+            <div class="purchase-modal-footer"><button type="button" class="btn-secondary"
+                    data-close-modal="paidModal">Batal</button><button type="submit" class="btn-primary">Simpan
+                    PAID</button></div>
         </form>
     </div>
 </div>
@@ -1877,28 +2215,57 @@ require __DIR__ . '/../includes/header.php';
 
 
 <script>
-(function(){
-'use strict';
-function openModal(id){var m=document.getElementById(id);if(m){m.classList.add('show');m.setAttribute('aria-hidden','false');document.body.style.overflow='hidden';}}
-function closeModal(id){var m=document.getElementById(id);if(m){m.classList.remove('show');m.setAttribute('aria-hidden','true');if(!document.querySelector('.purchase-modal.show'))document.body.style.overflow='';}}
-document.querySelectorAll('[data-close-modal]').forEach(function(b){b.addEventListener('click',function(){closeModal(this.getAttribute('data-close-modal'));});});
-document.querySelectorAll('.purchase-modal').forEach(function(m){m.addEventListener('click',function(e){if(e.target===m)closeModal(m.id);});});
-document.addEventListener('keydown',function(e){if(e.key==='Escape')document.querySelectorAll('.purchase-modal.show').forEach(function(m){closeModal(m.id);});});
+    (function () {
+        'use strict';
+        function openModal(id) { var m = document.getElementById(id); if (m) { m.classList.add('show'); m.setAttribute('aria-hidden', 'false'); document.body.style.overflow = 'hidden'; } }
+        function closeModal(id) { var m = document.getElementById(id); if (m) { m.classList.remove('show'); m.setAttribute('aria-hidden', 'true'); if (!document.querySelector('.purchase-modal.show')) document.body.style.overflow = ''; } }
+        document.querySelectorAll('[data-close-modal]').forEach(function (b) { b.addEventListener('click', function () { closeModal(this.getAttribute('data-close-modal')); }); });
+        document.querySelectorAll('.purchase-modal').forEach(function (m) { m.addEventListener('click', function (e) { if (e.target === m) closeModal(m.id); }); });
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape') document.querySelectorAll('.purchase-modal.show').forEach(function (m) { closeModal(m.id); }); });
 
-var headerBtn=document.getElementById('openHeaderModal');if(headerBtn)headerBtn.addEventListener('click',function(){openModal('headerModal');});
-var unitBtn=document.getElementById('openUnitModal');if(unitBtn)unitBtn.addEventListener('click',function(){
- document.getElementById('unitAction').value='add_unit';document.getElementById('unitDetailId').value='';document.getElementById('unitModalTitle').textContent='Tambah Unit';document.getElementById('unitSubmit').textContent='Simpan Unit';document.getElementById('unitSelect').value='';document.getElementById('unitHarga').value='0';document.getElementById('unitUsd').value='0';document.getElementById('unitKeterangan').value='';openModal('unitModal');
-});
-document.querySelectorAll('.edit-unit').forEach(function(b){b.addEventListener('click',function(){
- document.getElementById('unitAction').value='update_unit';document.getElementById('unitDetailId').value=this.dataset.id||'';document.getElementById('unitModalTitle').textContent='Edit Unit';document.getElementById('unitSubmit').textContent='Simpan Perubahan';document.getElementById('unitSelect').value=this.dataset.unit||'';document.getElementById('unitHarga').value=this.dataset.harga||'0';document.getElementById('unitUsd').value=this.dataset.usd||'0';document.getElementById('unitKeterangan').value=this.dataset.keterangan||'';openModal('unitModal');
-});});
-var paymentBtn=document.getElementById('openPaymentModal');if(paymentBtn)paymentBtn.addEventListener('click',function(){openModal('paymentModal');});
-var genBtn=document.getElementById('openGenerateModal');if(genBtn)genBtn.addEventListener('click',function(){openModal('generateModal');});
+        var headerBtn = document.getElementById('openHeaderModal'); if (headerBtn) headerBtn.addEventListener('click', function () { openModal('headerModal'); });
+        var unitBtn = document.getElementById('openUnitModal'); if (unitBtn) unitBtn.addEventListener('click', function () {
+            document.getElementById('unitAction').value = 'add_unit'; document.getElementById('unitDetailId').value = ''; document.getElementById('unitModalTitle').textContent = 'Tambah Unit'; document.getElementById('unitSubmit').textContent = 'Simpan Unit'; document.getElementById('unitSelect').value = ''; document.getElementById('unitHarga').value = '0'; document.getElementById('unitUsd').value = '0'; document.getElementById('unitKeterangan').value = ''; openModal('unitModal');
+        });
+        document.querySelectorAll('.edit-unit').forEach(function (b) {
+            b.addEventListener('click', function () {
+                document.getElementById('unitAction').value = 'update_unit'; document.getElementById('unitDetailId').value = this.dataset.id || ''; document.getElementById('unitModalTitle').textContent = 'Edit Unit'; document.getElementById('unitSubmit').textContent = 'Simpan Perubahan'; document.getElementById('unitSelect').value = this.dataset.unit || ''; document.getElementById('unitHarga').value = this.dataset.harga || '0'; document.getElementById('unitUsd').value = this.dataset.usd || '0'; document.getElementById('unitKeterangan').value = this.dataset.keterangan || ''; openModal('unitModal');
+            });
+        });
+        var paymentBtn = document.getElementById('openPaymentModal'); if (paymentBtn) paymentBtn.addEventListener('click', function () { openModal('paymentModal'); });
+        var genBtn = document.getElementById('openGenerateModal'); if (genBtn) genBtn.addEventListener('click', function () { openModal('generateModal'); });
 
-document.querySelectorAll('.paid-button').forEach(function(b){b.addEventListener('click',function(){
- document.getElementById('paidPaymentId').value=this.dataset.id||'';document.getElementById('paidSubtitle').textContent='Termin '+(this.dataset.termin||'')+' · Pembayaran akan otomatis masuk ke Pengeluaran.';document.getElementById('paidNominal').textContent='Rp '+new Intl.NumberFormat('id-ID',{maximumFractionDigits:0}).format(parseFloat(this.dataset.nominal||0));openModal('paidModal');
-});});
-})();
+        var editPaymentStatus = document.getElementById('editPaymentStatus');
+        function syncPaymentPaidFields() {
+            var paid = editPaymentStatus && editPaymentStatus.value === 'PAID';
+            document.querySelectorAll('#editPaymentModal .payment-paid-only').forEach(function (el) { el.classList.toggle('is-hidden', !paid); });
+            var date = document.getElementById('editPaymentDate'), method = document.getElementById('editPaymentMethod');
+            if (date) date.required = paid;
+            if (method) method.required = paid;
+        }
+        if (editPaymentStatus) editPaymentStatus.addEventListener('change', syncPaymentPaidFields);
+        document.querySelectorAll('.edit-payment').forEach(function (b) {
+            b.addEventListener('click', function () {
+                document.getElementById('editPaymentId').value = this.dataset.id || '';
+                document.getElementById('editPaymentSubtitle').textContent = 'Termin ' + (this.dataset.termin || '');
+                document.getElementById('editPaymentStatus').value = this.dataset.status || 'BELUM_BAYAR';
+                document.getElementById('editPaymentDue').value = this.dataset.jatuhTempo || '';
+                document.getElementById('editPaymentNominal').value = this.dataset.nominal || '0';
+                document.getElementById('editPaymentDate').value = this.dataset.tanggalBayar || '';
+                document.getElementById('editPaymentMethod').value = this.dataset.metode || '';
+                document.getElementById('editPaymentReference').value = this.dataset.referensi || '';
+                document.getElementById('editPaymentNote').value = this.dataset.keterangan || '';
+                syncPaymentPaidFields();
+                openModal('editPaymentModal');
+            });
+        });
+
+        document.querySelectorAll('.paid-button').forEach(function (b) {
+            b.addEventListener('click', function () {
+                document.getElementById('paidPaymentId').value = this.dataset.id || ''; document.getElementById('paidSubtitle').textContent = 'Termin ' + (this.dataset.termin || '') + ' · Pembayaran akan otomatis masuk ke Pengeluaran.'; document.getElementById('paidNominal').textContent = 'Rp ' + new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(parseFloat(this.dataset.nominal || 0)); openModal('paidModal');
+            });
+        });
+    })();
 </script>
 
 <?php require __DIR__ . '/../includes/footer.php'; ?>
