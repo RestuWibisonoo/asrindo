@@ -24,16 +24,12 @@ function rupiah($value): string
     return number_format((float)($value ?? 0), 0, ',', '.');
 }
 
-function redirectMessage(string $type, string $message, ?int $openDetailId = null): void
+function redirectMessage(string $type, string $message): void
 {
-    $params = [
+    header('Location: pembelian_sparepart.php?' . http_build_query([
         'msg_type' => $type,
         'msg' => $message
-    ];
-    if ($openDetailId !== null && $openDetailId > 0) {
-        $params['open_detail_id'] = $openDetailId;
-    }
-    header('Location: pembelian_sparepart.php?' . http_build_query($params));
+    ]));
     exit;
 }
 
@@ -459,7 +455,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $pdo->commit();
 
-            redirectMessage('success', 'Pembelian sparepart berhasil ditambahkan.', $purchaseId);
+            redirectMessage('success', 'Pembelian sparepart berhasil ditambahkan.');
         }
 
         /*
@@ -676,7 +672,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $pdo->commit();
 
-            redirectMessage('success', 'Detail sparepart berhasil ditambahkan.', $purchaseId);
+            redirectMessage('success', 'Detail sparepart berhasil ditambahkan.');
         }
 
         /*
@@ -784,7 +780,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $pdo->commit();
 
-            redirectMessage('success', 'Detail pembelian berhasil diperbarui.', (int)$old['pembelian_id']);
+            redirectMessage('success', 'Detail pembelian berhasil diperbarui.');
         }
 
         /*
@@ -844,7 +840,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $pdo->commit();
 
-            redirectMessage('success', 'Detail pembelian berhasil dihapus.', (int)$detail['pembelian_id']);
+            redirectMessage('success', 'Detail pembelian berhasil dihapus.');
         }
 
         /*
@@ -2574,20 +2570,6 @@ require_once __DIR__ . '/../includes/header.php';
 
     calculateAll();
     renderTable();
-
-    <?php if (isset($_GET['open_detail_id'])): ?>
-    var openDetailId = <?php echo (int)$_GET['open_detail_id']; ?>;
-    if (openDetailId > 0) {
-        openDetailModal(openDetailId);
-    }
-    <?php endif; ?>
-
-    <?php if (isset($_GET['msg']) || isset($_GET['open_detail_id'])): ?>
-    if (window.history.replaceState) {
-        var cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
-        window.history.replaceState({path: cleanUrl}, '', cleanUrl);
-    }
-    <?php endif; ?>
 })();
 </script>
 
