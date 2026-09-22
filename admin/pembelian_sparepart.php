@@ -24,12 +24,16 @@ function rupiah($value): string
     return number_format((float)($value ?? 0), 0, ',', '.');
 }
 
-function redirectMessage(string $type, string $message): void
+function redirectMessage(string $type, string $message, ?int $openDetailId = null): void
 {
-    header('Location: pembelian_sparepart.php?' . http_build_query([
+    $params = [
         'msg_type' => $type,
         'msg' => $message
-    ]));
+    ];
+    if ($openDetailId !== null && $openDetailId > 0) {
+        $params['open_detail_id'] = $openDetailId;
+    }
+    header('Location: pembelian_sparepart.php?' . http_build_query($params));
     exit;
 }
 
@@ -455,7 +459,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $pdo->commit();
 
-            redirectMessage('success', 'Pembelian sparepart berhasil ditambahkan.');
+            redirectMessage('success', 'Pembelian sparepart berhasil ditambahkan.', $purchaseId);
         }
 
         /*
@@ -672,7 +676,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $pdo->commit();
 
-            redirectMessage('success', 'Detail sparepart berhasil ditambahkan.');
+            redirectMessage('success', 'Detail sparepart berhasil ditambahkan.', $purchaseId);
         }
 
         /*
@@ -780,7 +784,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $pdo->commit();
 
-            redirectMessage('success', 'Detail pembelian berhasil diperbarui.');
+            redirectMessage('success', 'Detail pembelian berhasil diperbarui.', (int)$old['pembelian_id']);
         }
 
         /*
@@ -840,7 +844,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $pdo->commit();
 
-            redirectMessage('success', 'Detail pembelian berhasil dihapus.');
+            redirectMessage('success', 'Detail pembelian berhasil dihapus.', (int)$detail['pembelian_id']);
         }
 
         /*
@@ -2570,6 +2574,13 @@ require_once __DIR__ . '/../includes/header.php';
 
     calculateAll();
     renderTable();
+
+    <?php if (isset($_GET['open_detail_id'])): ?>
+    var openDetailId = <?php echo (int)$_GET['open_detail_id']; ?>;
+    if (openDetailId > 0) {
+        openDetailModal(openDetailId);
+    }
+    <?php endif; ?>
 })();
 </script>
 
