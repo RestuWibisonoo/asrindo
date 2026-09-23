@@ -126,7 +126,7 @@ function stockDelta(PDO $pdo, int $sparepartId, float $delta): void
  * saat status SELESAI transaksi dianggap sudah dibayar dan dicatat
  * langsung sebagai pengeluaran.
  */
-function syncPurchaseExpense(PDO $pdo, int $purchaseId): void
+function syncPurchaseExpense(PDO $pdo, int $purchaseId, ?int $rekeningId = null): void
 {
     $stmt = $pdo->prepare("
         SELECT id, nomor_pembelian, tanggal, total, status
@@ -165,7 +165,8 @@ function syncPurchaseExpense(PDO $pdo, int $purchaseId): void
                 UPDATE pengeluaran
                 SET tanggal = ?,
                     nominal = ?,
-                    keterangan = ?
+                    keterangan = ?,
+                    rekening_id = COALESCE(rekening_id, ?)
                 WHERE id = ?
                 LIMIT 1
             ");
@@ -173,6 +174,7 @@ function syncPurchaseExpense(PDO $pdo, int $purchaseId): void
                 $purchase['tanggal'],
                 $nominal,
                 'Pembayaran pembelian sparepart ' . $purchase['nomor_pembelian'],
+                $rekeningId,
                 (int) $expense['id']
             ]);
         } else {
@@ -206,10 +208,11 @@ function syncPurchaseExpense(PDO $pdo, int $purchaseId): void
                         metode_pembayaran,
                         referensi,
                         keterangan,
+                        rekening_id,
                         created_by
                     )
                 VALUES
-                    (?, ?, 'PEMBELIAN', ?, NULL, ?, ?, ?, NULL, ?, ?, ?)
+                    (?, ?, 'PEMBELIAN', ?, NULL, ?, ?, ?, NULL, ?, ?, ?, ?)
             ");
             $stmt->execute([
                 $nomorPengeluaran,
@@ -220,6 +223,7 @@ function syncPurchaseExpense(PDO $pdo, int $purchaseId): void
                 $nominal,
                 $purchase['nomor_pembelian'],
                 'Pembayaran pembelian sparepart ' . $purchase['nomor_pembelian'],
+                $rekeningId,
                 isset($_SESSION['admin_id']) ? (int) $_SESSION['admin_id'] : null
             ]);
         }
@@ -581,7 +585,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $id
             ]);
 
-            syncPurchaseExpense($pdo, (int) $id);
+            $rekeningId = filter_var($_POST['rekening_id'] ?? null, FILTER_VALIDATE_INT) ?: null;
+
+            syncPurchaseExpense($pdo, (int) $id, $rekeningId);
 
             $pdo->commit();
 
@@ -933,6 +939,13 @@ $suppliers = $pdo->query("
     FROM supplier
     WHERE UPPER(status) = 'AKTIF'
     ORDER BY nama ASC
+")->fetchAll(PDO::FETCH_ASSOC);
+
+$rekeningOptions = $pdo->query("
+    SELECT id, nama_rekening, nama_bank
+    FROM rekening
+    WHERE status = 'Aktif'
+    ORDER BY nama_rekening ASC
 ")->fetchAll(PDO::FETCH_ASSOC);
 
 $spareparts = $pdo->query("
@@ -1913,6 +1926,19 @@ require_once __DIR__ . '/../includes/header.php';
                             <option value="SELESAI">SELESAI</option>
                             <option value="BATAL">BATAL</option>
                         </select>
+                    </div>
+
+                    <div class="form-group form-group-full">
+                        <label>Rekening (Khusus Jika SELESAI)</label>
+                        <select name="rekening_id" id="editHeaderRekening">
+                            <option value="">-- Pilih Rekening (Opsional) --</option>
+                            <?php foreach ($rekeningOptions as $rek): ?>
+                                <option value="<?php echo (int) $rek['id']; ?>">
+                                    <?php echo h($rek['nama_rekening']); ?> — <?php echo h($rek['nama_bank']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <small style="color: #6c757d; font-size: 11px;">Hanya digunakan jika status diubah ke SELESAI (untuk mencatat pengeluaran otomatis).</small>
                     </div>
 
                     <div class="form-group form-group-full">

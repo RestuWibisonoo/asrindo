@@ -73,6 +73,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 FILTER_VALIDATE_INT
             );
             $jenisPembayaran = trim((string)($_POST['jenis_pembayaran'] ?? ''));
+            $rekeningId = filter_var(
+                $_POST['rekening_id'] ?? null,
+                FILTER_VALIDATE_INT
+            ) ?: null;
             $nominalRaw = trim((string)($_POST['nominal'] ?? ''));
             $metode = trim((string)($_POST['metode_pembayaran'] ?? ''));
             $referensi = trim((string)($_POST['referensi'] ?? ''));
@@ -127,11 +131,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     metode_pembayaran,
                     referensi,
                     keterangan,
+                    rekening_id,
                     created_by
                 )
                 VALUES
                 (
-                    ?, ?, 'NON_PENJUALAN', NULL, ?, ?, ?, ?, ?, ?, ?
+                    ?, ?, 'NON_PENJUALAN', NULL, ?, ?, ?, ?, ?, ?, ?, ?
                 )
             ");
 
@@ -144,6 +149,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $metode !== '' ? $metode : null,
                 $referensi !== '' ? $referensi : null,
                 $keterangan !== '' ? $keterangan : null,
+                $rekeningId,
                 (int)$_SESSION['admin_id']
             ]);
 
@@ -211,6 +217,15 @@ $categories = $pdo->query("
     WHERE tipe = 'PENDAPATAN'
     ORDER BY nama ASC
 ")->fetchAll(PDO::FETCH_ASSOC);
+
+/* Daftar rekening aktif untuk dropdown */
+$rekeningOptions = $pdo->query("
+    SELECT id, nama_rekening, nama_bank
+    FROM rekening
+    WHERE status = 'Aktif'
+    ORDER BY nama_rekening ASC
+")->fetchAll(PDO::FETCH_ASSOC);
+
 
 /*
  * Daftar pemasukan:
@@ -973,6 +988,18 @@ require __DIR__ . '/../includes/header.php';
                             class="form-control"
                             placeholder="No. bukti / transfer / kuitansi"
                         >
+                    </div>
+
+                    <div class="form-group">
+                        <label class="field-label">Rekening Tujuan</label>
+                        <select name="rekening_id" class="form-control">
+                            <option value="">-- Pilih Rekening (Opsional) --</option>
+                            <?php foreach ($rekeningOptions as $rek): ?>
+                                <option value="<?php echo (int)$rek['id']; ?>">
+                                    <?php echo h($rek['nama_rekening']); ?> — <?php echo h($rek['nama_bank']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
                     </div>
 
                     <div class="form-group full">

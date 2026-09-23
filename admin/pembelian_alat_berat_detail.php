@@ -619,6 +619,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $metode = strtoupper(trim((string) ($_POST['metode_pembayaran'] ?? '')));
             $referensi = trim((string) ($_POST['referensi'] ?? ''));
             $keterangan = trim((string) ($_POST['keterangan_pembayaran'] ?? ''));
+            $rekeningId = filter_var($_POST['rekening_id'] ?? null, FILTER_VALIDATE_INT) ?: null;
 
             if (!$paymentId) {
                 throw new RuntimeException('Termin pembayaran tidak valid.');
@@ -704,9 +705,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 INSERT INTO pengeluaran
                     (nomor_pengeluaran, tanggal, sumber, pembelian_pembayaran_id,
                      kategori_id, jenis_pengeluaran, nominal, metode_pembayaran,
-                     referensi, keterangan, created_by)
+                     referensi, keterangan, rekening_id, created_by)
                 VALUES (?, ?, 'PEMBELIAN', ?, ?, 'Pembayaran Pembelian Alat Berat',
-                        ?, ?, ?, ?, ?)
+                        ?, ?, ?, ?, ?, ?)
             ");
             $stmt->execute([
                 $nomorPengeluaran,
@@ -717,6 +718,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $metode,
                 $referensi !== '' ? $referensi : null,
                 $keterangan !== '' ? $keterangan : null,
+                $rekeningId,
                 (int) $_SESSION['admin_id']
             ]);
 
@@ -1708,6 +1710,14 @@ $extraHead = <<<'HTML'
 </style>
 HTML;
 
+/* Rekening aktif untuk dropdown di form pembayaran termin */
+$rekeningOptions = $pdo->query("
+    SELECT id, nama_rekening, nama_bank
+    FROM rekening
+    WHERE status = 'Aktif'
+    ORDER BY nama_rekening ASC
+")->fetchAll(PDO::FETCH_ASSOC);
+
 require __DIR__ . '/../includes/header.php';
 ?>
 
@@ -2201,6 +2211,17 @@ require __DIR__ . '/../includes/header.php';
                         </select></div>
                     <div class="purchase-field purchase-field-full"><label>Referensi</label><input type="text"
                             name="referensi" maxlength="100" placeholder="Nomor transfer / bukti pembayaran"></div>
+                    <div class="purchase-field purchase-field-full">
+                        <label>Rekening Pembayaran</label>
+                        <select name="rekening_id">
+                            <option value="">-- Pilih Rekening (Opsional) --</option>
+                            <?php foreach ($rekeningOptions as $rek): ?>
+                                <option value="<?php echo (int)$rek['id']; ?>">
+                                    <?php echo h($rek['nama_rekening']); ?> — <?php echo h($rek['nama_bank']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
                     <div class="purchase-field purchase-field-full"><label>Keterangan</label><textarea
                             name="keterangan_pembayaran" rows="3"></textarea></div>
                 </div>
