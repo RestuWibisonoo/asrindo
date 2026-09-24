@@ -348,31 +348,74 @@ require __DIR__ . '/../includes/header.php';
     .btn-danger:hover {
         background: #fff0ef;
     }
+
+    .btn-sm {
+        padding: 5px 10px;
+        font-size: 11px;
+    }
     
     /* Table utilities */
-    .dashboard-table .money { text-align: right !important; font-weight: 600; }
+    .dashboard-table tbody tr:hover { background: #fafcff; }
+    .dashboard-table .money { text-align: right !important; font-weight: 600; white-space: nowrap; }
     .dashboard-table .center { text-align: center !important; }
     .dashboard-table .muted { color: #7a8798; font-size: 11px; margin-top: 3px; display: block; }
     
-    .badge { display:inline-flex; padding:4px 8px; border-radius:4px; font-size:11px; font-weight:700; }
-    .badge-active { background:#e7f6ec; color:#16743a; }
-    .badge-other { background:#eef2f6; color:#5c6878; }
+    .badge { display:inline-flex; align-items:center; padding:4px 8px; border-radius:4px; font-size:11px; font-weight:700; }
+    .badge-success { background:#e7f6ec; color:#16743a; }
+    .badge-warning { background:#fef3c7; color:#92400e; }
+    .badge-danger { background:#fee2e2; color:#b91c1c; }
+    .badge-info { background:#e0f2fe; color:#0369a1; }
+    .badge-neutral { background:#f1f5f9; color:#475569; border: 1px solid #cbd5e1; }
 
-    .asset-toolbar { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
-    .asset-toolbar-left { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-    .asset-toolbar form { display:flex; gap:8px; flex-wrap:wrap; }
-    .asset-toolbar input, .asset-toolbar select {
-        box-sizing:border-box; border:1px solid #d7dee7; border-radius:5px; padding:8px 10px; background:#fff; font:inherit; font-size: 13px;
+    .panel-subtitle { display: block; margin-top: 3px; color: #718096; font-size: 12px; font-weight: 400; }
+    .empty-state { padding:36px 20px !important; text-align:center !important; color:#64748b; font-size:13px; font-style:italic; }
+
+    /* Panel toolbar & filters */
+    .panel-toolbar {
+        padding: 12px 16px;
+        border-bottom: 1px solid #edf0f4;
+        background: #fafbfc;
     }
-    .asset-toolbar input { width:260px; }
-    .asset-toolbar select { width:150px; }
+    .toolbar-filter-form {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+    .toolbar-input {
+        width: 280px;
+        height: 36px;
+        box-sizing: border-box;
+        border: 1px solid #bdcadc;
+        border-radius: 4px;
+        padding: 8px 10px;
+        background: #fff;
+        color: #172b4d;
+        font-size: 13px;
+        outline: none;
+    }
+    .toolbar-select {
+        width: 160px;
+        height: 36px;
+        box-sizing: border-box;
+        border: 1px solid #bdcadc;
+        border-radius: 4px;
+        padding: 8px 10px;
+        background: #fff;
+        color: #172b4d;
+        font-size: 13px;
+        outline: none;
+    }
+    .toolbar-input:focus, .toolbar-select:focus {
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 2px rgba(13,110,253,.08);
+    }
 
     .asset-actions { display:flex; gap:6px; flex-wrap:wrap; }
-    .asset-empty { padding:40px 20px !important; text-align:center !important; color:#64748b; font-size:14px; }
     
-    .asset-alert { border-radius:5px; padding:11px 14px; margin-bottom:16px; font-size:13px; }
-    .asset-alert-success { background:#d1e7dd; color:#0f5132; }
-    .asset-alert-error { background:#f8d7da; color:#842029; }
+    .alert { padding: 12px 14px; border-radius: 6px; margin-bottom: 18px; font-size: 14px; }
+    .alert-success { background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; }
+    .alert-error { background:#fff1f2; color:#b42318; border:1px solid #fecdd3; }
     
     /* Modal styles */
     .liability-modal {
@@ -468,6 +511,7 @@ require __DIR__ . '/../includes/header.php';
         margin-bottom: 6px;
         color: #263d60;
         font-size: 12px;
+        font-weight: 500;
     }
     
     .liability-field label span {
@@ -506,72 +550,82 @@ require __DIR__ . '/../includes/header.php';
         box-shadow: 0 0 0 2px rgba(20, 115, 230, .08);
     }
     
-    @media (max-width: 800px) {
+    @media (max-width: 900px) {
         .dashboard-finance-grid { grid-template-columns:repeat(2, minmax(0,1fr)); }
         .liability-form-grid { grid-template-columns:1fr; }
         .liability-field-full { grid-column:auto; }
-        .asset-toolbar input, .asset-toolbar select { width:100%; }
-        .asset-toolbar form { width:100%; }
+        .toolbar-input, .toolbar-select { width:100%; }
+        .toolbar-filter-form { width:100%; }
     }
-    @media (max-width: 480px) { .dashboard-finance-grid { grid-template-columns:1fr; } }
+    @media (max-width: 500px) { .dashboard-finance-grid { grid-template-columns:1fr; } }
 </style>
 
-<div class="asset-page">
-    <div class="admin-page-header">
+<div>
+    <section class="page-heading">
         <div>
             <h1>Aset Tetap</h1>
-            <div style="font-size:12px;color:#718096;margin-top:3px;">Aset operasional perusahaan seperti mobil operasional, komputer, mesin, dan peralatan kantor.</div>
+            <p>Aset operasional perusahaan seperti mobil operasional, komputer, mesin, dan peralatan kantor.</p>
         </div>
-    </div>
+        <div>
+            <button class="btn-primary" type="button" onclick="openAssetModal()">
+                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                Tambah Aset Tetap
+            </button>
+        </div>
+    </section>
 
     <?php if ($flashMessage !== ''): ?>
-        <div class="asset-alert asset-alert-<?php echo $flashType === 'error' ? 'error' : 'success'; ?>">
+        <div class="alert alert-<?php echo $flashType === 'error' ? 'error' : 'success'; ?>">
             <?php echo h($flashMessage); ?>
         </div>
     <?php endif; ?>
 
-    <div class="dashboard-finance-grid">
-        <div class="dashboard-finance-card">
+    <section class="dashboard-finance-grid">
+        <article class="dashboard-finance-card">
             <strong><?php echo number_format($activeCount, 0, ',', '.'); ?> aset</strong>
             <span>Jumlah Aset Aktif</span>
-        </div>
-        <div class="dashboard-finance-card net">
+            <div class="muted" style="margin-top:6px; padding-left:4px;">Aset operasional yang berstatus aktif digunakan.</div>
+        </article>
+        <article class="dashboard-finance-card net">
             <strong><?php echo rupiah($totalHargaBeli); ?></strong>
-            <span>Total Harga Beli</span>
-        </div>
-        <div class="dashboard-finance-card warning">
+            <span>Total Nilai Perolehan</span>
+            <div class="muted" style="margin-top:6px; padding-left:4px;">Total akumulasi harga beli awal aset.</div>
+        </article>
+        <article class="dashboard-finance-card warning">
             <strong><?php echo rupiah($totalPenyusutan); ?></strong>
             <span>Akumulasi Penyusutan</span>
-        </div>
-        <div class="dashboard-finance-card success">
+            <div class="muted" style="margin-top:6px; padding-left:4px;">Total depresiasi/penyusutan berjalan.</div>
+        </article>
+        <article class="dashboard-finance-card success">
             <strong><?php echo rupiah($totalNilaiBuku); ?></strong>
             <span>Nilai Buku Aset</span>
-        </div>
-    </div>
+            <div class="muted" style="margin-top:6px; padding-left:4px;">Nilai buku bersih (Harga Beli - Penyusutan).</div>
+        </article>
+    </section>
 
-    <div class="asset-toolbar">
-        <div class="asset-toolbar-left">
-            <form method="get">
-                <input type="text" name="q" value="<?php echo h($search); ?>" placeholder="Cari kode, nama, nomor, lokasi...">
-                <select name="status">
+    <section class="dashboard-panel" style="margin-top:20px;">
+        <div class="panel-heading">
+            <div>
+                <h2>Daftar Aset Tetap</h2>
+                <span class="panel-subtitle">Total <?php echo count($assets); ?> aset operasional tercatat</span>
+            </div>
+        </div>
+        <div class="panel-toolbar">
+            <form method="get" class="toolbar-filter-form">
+                <input type="text" name="q" value="<?php echo h($search); ?>" placeholder="Cari kode, nama, nomor, lokasi..." class="toolbar-input">
+                <select name="status" class="toolbar-select">
                     <option value="">Semua status</option>
                     <?php foreach (['AKTIF','DIJUAL','RUSAK','TIDAK_AKTIF'] as $st): ?>
                         <option value="<?php echo h($st); ?>" <?php echo $statusFilter === $st ? 'selected' : ''; ?>><?php echo h(str_replace('_', ' ', $st)); ?></option>
                     <?php endforeach; ?>
                 </select>
                 <button class="btn-secondary" type="submit">Filter</button>
-                <?php if ($search !== '' || $statusFilter !== ''): ?><a class="btn-secondary" href="aset_tetap.php" style="text-decoration:none;">Reset</a><?php endif; ?>
+                <?php if ($search !== '' || $statusFilter !== ''): ?>
+                    <a class="btn-secondary" href="aset_tetap.php" style="text-decoration:none;">Reset</a>
+                <?php endif; ?>
             </form>
         </div>
-        <button class="btn-primary" type="button" onclick="openAssetModal()">
-            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-            Tambah Aset Tetap
-        </button>
-    </div>
-
-    <div class="dashboard-panel">
-        <div class="dashboard-panel-header">Daftar Aset Tetap</div>
-        <div style="overflow-x:auto;">
+        <div class="table-responsive">
             <table class="dashboard-table">
                 <thead>
                     <tr>
@@ -580,22 +634,30 @@ require __DIR__ . '/../includes/header.php';
                         <th>Kategori</th>
                         <th>Tgl Perolehan</th>
                         <th class="money">Harga Beli</th>
-                        <th class="center">Penyusutan / Tahun</th>
-                        <th class="money">Penyusutan / Bulan</th>
+                        <th class="center">Penyusutan / Thn</th>
+                        <th class="money">Penyusutan / Bln</th>
                         <th class="money">Akumulasi Penyusutan</th>
                         <th class="money">Nilai Buku</th>
-                        <th>Status</th>
-                        <th>Aksi</th>
+                        <th class="center">Status</th>
+                        <th class="center" style="width: 110px;">Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
                 <?php if (!$assets): ?>
-                    <tr><td colspan="11" class="asset-empty">Belum ada aset tetap.</td></tr>
+                    <tr><td colspan="11" class="empty-state">Belum ada aset tetap.</td></tr>
                 <?php else: ?>
                     <?php foreach ($assets as $asset): ?>
                         <?php 
                             $persenFormat = number_format($asset['penyusutan_persen'], 2, ',', '.');
                             $persenFormat = str_replace(',00', '', $persenFormat);
+                            $statusClass = 'badge-neutral';
+                            if ($asset['status'] === 'AKTIF') {
+                                $statusClass = 'badge-success';
+                            } elseif ($asset['status'] === 'DIJUAL') {
+                                $statusClass = 'badge-info';
+                            } elseif ($asset['status'] === 'RUSAK') {
+                                $statusClass = 'badge-danger';
+                            }
                         ?>
                         <tr>
                             <td><strong><?php echo h($asset['kode']); ?></strong><span class="muted"><?php echo h($asset['nomor_identitas']); ?></span></td>
@@ -607,14 +669,14 @@ require __DIR__ . '/../includes/header.php';
                             <td class="money"><?php echo rupiah($asset['penyusutan_bulanan']); ?></td>
                             <td class="money"><?php echo rupiah($asset['penyusutan']); ?></td>
                             <td class="money"><strong><?php echo rupiah($asset['nilai_buku']); ?></strong><span class="muted"><?php echo $asset['umur_berjalan_bulan']; ?> bulan</span></td>
-                            <td><span class="badge <?php echo $asset['status'] === 'AKTIF' ? 'badge-active' : 'badge-other'; ?>"><?php echo h(str_replace('_', ' ', $asset['status'])); ?></span></td>
-                            <td>
-                                <div class="asset-actions">
-                                    <button type="button" class="btn-secondary" style="padding:4px 8px;" onclick='editAsset(<?php echo json_encode($asset, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>)'>Edit</button>
+                            <td class="center"><span class="badge <?php echo $statusClass; ?>"><?php echo h(str_replace('_', ' ', $asset['status'])); ?></span></td>
+                            <td class="center">
+                                <div class="asset-actions" style="justify-content:center;">
+                                    <button type="button" class="btn-secondary btn-sm" onclick='editAsset(<?php echo json_encode($asset, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>)'>Edit</button>
                                     <form method="post" style="display:inline;" onsubmit="return confirm('Hapus aset ini?');">
                                         <input type="hidden" name="action" value="delete">
                                         <input type="hidden" name="id" value="<?php echo (int) $asset['id']; ?>">
-                                        <button class="btn-danger" style="padding:4px 8px;" type="submit">Hapus</button>
+                                        <button class="btn-danger btn-sm" type="submit">Hapus</button>
                                     </form>
                                 </div>
                             </td>
@@ -624,7 +686,7 @@ require __DIR__ . '/../includes/header.php';
                 </tbody>
             </table>
         </div>
-    </div>
+    </section>
 </div>
 
 <div class="liability-modal" id="assetModal">
