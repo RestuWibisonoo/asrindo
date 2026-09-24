@@ -438,11 +438,20 @@ $printOperatingTotal = array_sum(array_column($profitOperatingRows, 'nominal'));
 
 $printNetTotal = $printIncomeTotal - $printCogsTotal - $printOperatingTotal;
 $printCashEnd = $kasAkhirPeriode;
-$labaRugiPeriode = $printNetTotal;
-$labaRugiKumulatif = $printNetTotal; 
 $totalAset = $kasAkhirPeriode + $piutangPenjualan + $persediaanTotal + $asetTetap;
-$totalEkuitas = $totalAset - $totalLiabilitas;
-$modalAwal = $totalEkuitas - $labaRugiKumulatif;
+
+$stmt = $pdo->prepare("SELECT COALESCE(SUM(nominal), 0) FROM ekuitas WHERE jenis = 'MODAL_SETOR' AND tanggal <= ?");
+$stmt->execute([$tanggalAkhir]);
+$modalSetor = (float) $stmt->fetchColumn();
+
+$stmt = $pdo->prepare("SELECT COALESCE(SUM(nominal), 0) FROM ekuitas WHERE jenis = 'PRIVE' AND tanggal <= ?");
+$stmt->execute([$tanggalAkhir]);
+$prive = (float) $stmt->fetchColumn();
+
+$modalAwal = $modalSetor - $prive;
+// Laba/Rugi Neraca menyesuaikan selisih murni antara Aset Bersih dengan Modal Disetor
+$labaRugiPeriode = $totalAset - $totalLiabilitas - $modalAwal; 
+$totalEkuitas = $modalAwal + $labaRugiPeriode;
 
 
 /*
@@ -987,6 +996,7 @@ require_once __DIR__ . '/../includes/header.php';
                     
                     <!-- TABEL KIRI: ASET -->
                     <div style="flex: 1; border-right: 1px solid #dce3eb; display: flex; flex-direction: column; justify-content: space-between;">
+                        <h3 style="margin: 0; padding: 12px 20px; background: #f7f9fb; border-bottom: 1px solid #dce3eb; color: #172b4d; text-align: center; font-size: 15px;">AKTIVA <br><span style="font-size: 11px; font-weight: normal; color: #64748b;">(Aset Tetap dan Aset Lancar)</span></h3>
                         <table class="statement-table" style="margin-bottom: auto;">
                             <tbody>
                                 <tr class="section"><td colspan="2">ASET LANCAR</td></tr>
@@ -1022,6 +1032,7 @@ require_once __DIR__ . '/../includes/header.php';
 
                     <!-- TABEL KANAN: LIABILITAS & EKUITAS -->
                     <div style="flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+                        <h3 style="margin: 0; padding: 12px 20px; background: #f7f9fb; border-bottom: 1px solid #dce3eb; color: #172b4d; text-align: center; font-size: 15px;">PASIVA <br><span style="font-size: 11px; font-weight: normal; color: #64748b;">(Liabilitas dan Ekuitas)</span></h3>
                         <table class="statement-table" style="margin-bottom: auto;">
                             <tbody>
                                 <tr class="section liability"><td colspan="2">LIABILITAS</td></tr>
