@@ -585,6 +585,222 @@ $stmt = $pdo->prepare("SELECT COALESCE(k.nama, 'Tanpa Kategori') AS kategori, CO
 $stmt->execute([$tanggalAwal, $tanggalAkhir]);
 $expenseCategories = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+/*
+|--------------------------------------------------------------------------
+| DATA TREN ARUS KAS (BULANAN & TAHUNAN)
+|--------------------------------------------------------------------------
+*/
+$allCashFlowMonthly = [];
+try {
+    $stmt = $pdo->query("
+        SELECT DATE_FORMAT(tanggal, '%Y-%m') AS periode,
+               YEAR(tanggal) AS thn,
+               MONTH(tanggal) AS bln,
+               SUM(CASE WHEN t = 'in' THEN nominal ELSE 0 END) AS masuk,
+               SUM(CASE WHEN t = 'out' THEN nominal ELSE 0 END) AS keluar
+        FROM (
+            SELECT tanggal, nominal, 'in' AS t FROM pemasukan
+            UNION ALL
+            SELECT tanggal, nominal, 'out' AS t FROM pengeluaran
+        ) a
+        GROUP BY periode, thn, bln
+        ORDER BY periode ASC
+    ");
+    $allCashFlowMonthly = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Throwable $e) {
+    $allCashFlowMonthly = [];
+}
+
+$namaBulanSingkat = [
+    1 => 'Jan', 2 => 'Feb', 3 => 'Mar', 4 => 'Apr',
+    5 => 'Mei', 6 => 'Jun', 7 => 'Jul', 8 => 'Agu',
+    9 => 'Sep', 10 => 'Okt', 11 => 'Nov', 12 => 'Des'
+];
+
+$trenAvailableYears = [];
+foreach ($allCashFlowMonthly as $row) {
+    $yr = (int)$row['thn'];
+    if ($yr > 0 && !in_array($yr, $trenAvailableYears, true)) {
+        $trenAvailableYears[] = $yr;
+    }
+}
+$currentYear = (int)date('Y');
+if (!in_array($currentYear, $trenAvailableYears, true)) {
+    $trenAvailableYears[] = $currentYear;
+}
+sort($trenAvailableYears);
+
+// 1. Data Tahunan
+$trenYearlyData = [];
+foreach ($trenAvailableYears as $yr) {
+    $trenYearlyData[$yr] = [
+        'periode' => (string)$yr,
+        'label' => 'Tahun ' . $yr,
+        'singkat' => (string)$yr,
+        'masuk' => 0.0,
+        'keluar' => 0.0,
+        'selisih' => 0.0,
+    ];
+}
+foreach ($allCashFlowMonthly as $row) {
+    $yr = (int)$row['thn'];
+    if (isset($trenYearlyData[$yr])) {
+        $trenYearlyData[$yr]['masuk'] += (float)$row['masuk'];
+        $trenYearlyData[$yr]['keluar'] += (float)$row['keluar'];
+    }
+}
+foreach ($trenYearlyData as $yr => &$yData) {
+    $yData['selisih'] = $yData['masuk'] - $yData['keluar'];
+}
+unset($yData);
+
+// 2. Data Bulanan per Tahun (12 bulan)
+$trenMonthlyByYear = [];
+foreach ($trenAvailableYears as $yr) {
+    $trenMonthlyByYear[$yr] = [];
+    for ($m = 1; $m <= 12; $m++) {
+        $mStr = str_pad((string)$m, 2, '0', STR_PAD_LEFT);
+        $periode = $yr . '-' . $mStr;
+        $trenMonthlyByYear[$yr][] = [
+            'periode' => $periode,
+            'label' => ($namaBulanSingkat[$m] ?? '') . ' ' . $yr,
+            'singkat' => ($namaBulanSingkat[$m] ?? ''),
+            'masuk' => 0.0,
+            'keluar' => 0.0,
+            'selisih' => 0.0,
+        ];
+    }
+}
+$monthlyLookup = [];
+foreach ($allCashFlowMonthly as $row) {
+    $monthlyLookup[(string)$row['periode']] = [
+        'masuk' => (float)$row['masuk'],
+        'keluar' => (float)$row['keluar']
+    ];
+}
+foreach ($trenMonthlyByYear as $yr => &$mList) {
+    foreach ($mList as &$mItem) {
+        $p = $mItem['periode'];
+        if (isset($monthlyLookup[$p])) {
+            $mItem['masuk'] = $monthlyLookup[$p]['masuk'];
+            $mItem['keluar'] = $monthlyLookup[$p]['keluar'];
+            $mItem['selisih'] = $mItem['masuk'] - $mItem['keluar'];
+        }
+    }
+    unset($mItem);
+}
+unset($mList);
+
+// 3. Data Bulanan Sesuai Periode Filter
+$trenMonthlyPeriod = [];
+foreach ($monthlyRows as $mRow) {
+    $periode = (string)$mRow['periode'];
+    $parts = explode('-', $periode);
+    $mNum = isset($parts[1]) ? (int)$parts[1] : 1;
+    $yNum = isset($parts[0]) ? (int)$parts[0] : (int)date('Y');
+    $mLabel = ($namaBulanSingkat[$mNum] ?? '') . ' ' . $yNum;
+    $mSingkat = $namaBulanSingkat[$mNum] ?? $periode;
+    $inVal = (float)($mRow['pemasukan_kas'] ?? 0);
+    $outVal = (float)($mRow['pengeluaran_kas'] ?? 0);
+    $trenMonthlyPeriod[] = [
+        'periode' => $periode,
+        'label' => $mLabel,
+        'singkat' => $mSingkat,
+        'masuk' => $inVal,
+        'keluar' => $outVal,
+        'selisih' => $inVal - $outVal,
+    ];
+}
+
+$trenDefaultMode = trim((string)($_GET['tren_mode'] ?? 'bulanan'));
+if (!in_array($trenDefaultMode, ['bulanan', 'tahunan'], true)) {
+    $trenDefaultMode = 'bulanan';
+}
+
+$trenDefaultYear = trim((string)($_GET['tren_tahun'] ?? ''));
+if ($trenDefaultYear !== 'periode' && !in_array((int)$trenDefaultYear, $trenAvailableYears, true)) {
+    $trenDefaultYear = (string)date('Y', strtotime($tanggalAkhir));
+    if (!in_array((int)$trenDefaultYear, $trenAvailableYears, true)) {
+        $trenDefaultYear = (string)end($trenAvailableYears);
+    }
+}
+
+$trenDefaultTahunanRange = trim((string)($_GET['tren_tahunan_range'] ?? '5'));
+if (!in_array($trenDefaultTahunanRange, ['5', '10', 'semua', 'periode'], true)) {
+    $trenDefaultTahunanRange = '5';
+}
+
+$maxAvailableYear = !empty($trenAvailableYears) ? max($trenAvailableYears) : (int)date('Y');
+$startYearPeriod = (int)date('Y', strtotime($tanggalAwal));
+$endYearPeriod = (int)date('Y', strtotime($tanggalAkhir));
+$trenYearsForSelect = array_reverse($trenAvailableYears);
+
+$trenDataJson = json_encode([
+    'yearly' => array_values($trenYearlyData),
+    'monthlyByYear' => $trenMonthlyByYear,
+    'monthlyPeriod' => $trenMonthlyPeriod,
+    'availableYears' => $trenAvailableYears,
+    'periodLabel' => date('d M Y', strtotime($tanggalAwal)) . ' - ' . date('d M Y', strtotime($tanggalAkhir)),
+    'periodStartYear' => $startYearPeriod,
+    'periodEndYear' => $endYearPeriod,
+], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+
+// Siapkan data render awal di server
+$initialTrenItems = [];
+$isYearlyInitial = ($trenDefaultMode === 'tahunan');
+if ($isYearlyInitial) {
+    if ($trenDefaultTahunanRange === '5') {
+        $minYr = $maxAvailableYear - 4;
+        $initialTrenItems = array_values(array_filter($trenYearlyData, function ($y) use ($minYr, $maxAvailableYear) {
+            $yr = (int)$y['periode'];
+            return $yr >= $minYr && $yr <= $maxAvailableYear;
+        }));
+        $initialTitle = 'Pemasukan vs Pengeluaran per Tahun';
+        $initialSub = 'Perbandingan transaksi kas aktual (5 Tahun Terakhir: ' . $minYr . ' - ' . $maxAvailableYear . ')';
+    } elseif ($trenDefaultTahunanRange === '10') {
+        $minYr = $maxAvailableYear - 9;
+        $initialTrenItems = array_values(array_filter($trenYearlyData, function ($y) use ($minYr, $maxAvailableYear) {
+            $yr = (int)$y['periode'];
+            return $yr >= $minYr && $yr <= $maxAvailableYear;
+        }));
+        $initialTitle = 'Pemasukan vs Pengeluaran per Tahun';
+        $initialSub = 'Perbandingan transaksi kas aktual (10 Tahun Terakhir: ' . $minYr . ' - ' . $maxAvailableYear . ')';
+    } elseif ($trenDefaultTahunanRange === 'periode') {
+        $initialTrenItems = array_values(array_filter($trenYearlyData, function ($y) use ($startYearPeriod, $endYearPeriod) {
+            $yr = (int)$y['periode'];
+            return $yr >= $startYearPeriod && $yr <= $endYearPeriod;
+        }));
+        $initialTitle = 'Pemasukan vs Pengeluaran per Tahun';
+        $initialSub = 'Perbandingan transaksi kas aktual pada periode laporan (' . $startYearPeriod . ($startYearPeriod !== $endYearPeriod ? ' - ' . $endYearPeriod : '') . ')';
+    } else {
+        $initialTrenItems = array_values($trenYearlyData);
+        $initialTitle = 'Pemasukan vs Pengeluaran per Tahun';
+        $initialSub = 'Perbandingan seluruh riwayat transaksi kas aktual tahunan';
+    }
+} else {
+    if ($trenDefaultYear === 'periode') {
+        $initialTrenItems = $trenMonthlyPeriod;
+        $initialTitle = 'Pemasukan vs Pengeluaran per Bulan';
+        $initialSub = 'Transaksi kas aktual pada periode laporan (' . date('d M Y', strtotime($tanggalAwal)) . ' - ' . date('d M Y', strtotime($tanggalAkhir)) . ')';
+    } else {
+        $initialTrenItems = $trenMonthlyByYear[$trenDefaultYear] ?? [];
+        $initialTitle = 'Pemasukan vs Pengeluaran per Bulan';
+        $initialSub = 'Transaksi kas aktual 12 bulan (Tahun ' . $trenDefaultYear . ')';
+    }
+}
+
+$initialMaxVal = 0.0;
+$initialTotalIn = 0.0;
+$initialTotalOut = 0.0;
+foreach ($initialTrenItems as $it) {
+    $inV = (float)$it['masuk'];
+    $outV = (float)$it['keluar'];
+    $initialMaxVal = max($initialMaxVal, $inV, $outV);
+    $initialTotalIn += $inV;
+    $initialTotalOut += $outV;
+}
+$initialNet = $initialTotalIn - $initialTotalOut;
+
 require_once __DIR__ . '/../includes/header.php';
 ?>
 
@@ -638,6 +854,28 @@ require_once __DIR__ . '/../includes/header.php';
     .legend-dot { width: 9px; height: 9px; border-radius: 2px; }
     .legend-in { background: #5b8def }
     .legend-out { background: #d98282 }
+    .tren-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+    .tren-header-title { font-weight: 700; color: #172b4d; font-size: 14px; display: block; }
+    .tren-header-sub { display: block; margin-top: 3px; color: #8390a3; font-size: 11px; font-weight: 400; }
+    .tren-filter-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .tren-toggle-group { display: inline-flex; background: #edf2f7; border: 1px solid #dce3eb; border-radius: 6px; padding: 3px; gap: 2px; }
+    .tren-toggle-btn { border: none; background: transparent; color: #526b8d; padding: 6px 14px; font-size: 12px; font-weight: 600; border-radius: 4px; cursor: pointer; transition: all 0.15s ease-in-out; font-family: inherit; line-height: 1.4; }
+    .tren-toggle-btn:hover { color: #172b4d; background: rgba(255, 255, 255, 0.7); }
+    .tren-toggle-btn.active { background: #0d6efd; color: #fff; box-shadow: 0 1px 3px rgba(13, 110, 253, 0.25); }
+    .tren-filter-select { border: 1px solid #8fa4bd; border-radius: 5px; padding: 6px 28px 6px 10px; font-size: 12px; color: #172b4d; background-color: #fff; cursor: pointer; font-family: inherit; height: 33px; box-sizing: border-box; appearance: auto; -webkit-appearance: menulist; }
+    .tren-summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 18px; padding-top: 16px; border-top: 1px solid #edf2f7; }
+    .tren-summary-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px 14px; text-align: left; }
+    .tren-summary-label { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #64748b; margin-bottom: 4px; }
+    .tren-summary-val { font-size: 15px; font-weight: 700; color: #1e293b; }
+    .tren-summary-val.in { color: #2563eb; }
+    .tren-summary-val.out { color: #dc2626; }
+    .tren-summary-val.net.positive { color: #16a34a; }
+    .tren-summary-val.net.negative { color: #dc2626; }
+    .chart-wrap.is-yearly { justify-content: center; gap: 24px; }
+    .chart-column.is-yearly { max-width: 140px; min-width: 100px; }
+    .chart-column.is-yearly .chart-bars { max-width: 90px; gap: 8px; }
+    .chart-column.is-yearly .chart-bar { width: 32px; border-radius: 4px 4px 0 0; }
+    .chart-column.is-yearly .chart-month { font-size: 12px; font-weight: 700; color: #334155; margin-top: 4px; }
     .report-table { width: 100%; border-collapse: collapse; }
     .report-table th { background: #f5f7fa; color: #526b8d; font-size: 11px; text-align: left; padding: 9px 10px; border-bottom: 1px solid #dce3eb; white-space: nowrap; }
     .report-table td { padding: 9px 10px; font-size: 12px; border-bottom: 1px solid #e8edf2; }
@@ -738,6 +976,7 @@ require_once __DIR__ . '/../includes/header.php';
     @media(max-width:1150px) { .statement-grid { grid-template-columns: 1fr } .statement-grid .statement-card:nth-child(3) { grid-column: auto; grid-row: auto; } }
     @media(max-width:1250px) { .finance-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); } .dashboard-grid, .dashboard-grid.equal { grid-template-columns: 1fr; } }
     @media(max-width:800px) { .report-heading { flex-direction: column; align-items: stretch; } .period-form { flex-wrap: wrap; } .period-field { flex: 1; } .finance-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } .mini-grid { grid-template-columns: 1fr; } }
+    @media(max-width:768px) { .tren-summary-grid { grid-template-columns: 1fr; } .tren-header { flex-direction: column; align-items: flex-start; } .tren-filter-toolbar { width: 100%; justify-content: space-between; } .tren-filter-select { width: 100%; } }
     @media(max-width:600px) { .finance-cards { grid-template-columns: 1fr; } .period-form { display: grid; grid-template-columns: 1fr 1fr; } .period-field { min-width: 0; } .period-form .btn-report { grid-column: 1/-1; } }
 </style>
 
@@ -1122,25 +1361,91 @@ require_once __DIR__ . '/../includes/header.php';
 
     <div class="report-section-title">Tren Arus Kas</div>
     <div class="report-card">
-        <div class="report-card-header">Pemasukan vs Pengeluaran per Bulan<small>Transaksi kas aktual pada periode yang dipilih</small></div>
-        <div class="report-card-body">
-            <?php if (!$monthlyRows): ?>
-                <div class="empty-report">Belum ada transaksi keuangan pada periode tersebut.</div>
-            <?php else: ?>
-                <?php $maxMonthly = 0.0; foreach ($monthlyRows as $monthly) { $maxMonthly = max($maxMonthly, (float) $monthly['pemasukan_kas'], (float) $monthly['pengeluaran_kas']); } ?>
-                <div class="chart-wrap">
-                    <?php foreach ($monthlyRows as $monthly): ?>
-                        <?php $inValue = (float) $monthly['pemasukan_kas']; $outValue = (float) $monthly['pengeluaran_kas']; $inHeight = $maxMonthly > 0 ? ($inValue / $maxMonthly) * 165 : 2; $outHeight = $maxMonthly > 0 ? ($outValue / $maxMonthly) * 165 : 2; ?>
-                        <div class="chart-column">
-                            <div class="chart-bars" title="<?php echo h($monthly['periode'] . ' | Masuk: ' . rupiah($inValue) . ' | Keluar: ' . rupiah($outValue)); ?>">
-                                <div class="chart-bar in" style="height:<?php echo max(2, $inHeight); ?>px"></div>
-                                <div class="chart-bar out" style="height:<?php echo max(2, $outHeight); ?>px"></div>
-                            </div>
-                            <div class="chart-month"><?php echo h($monthly['periode']); ?></div>
-                        </div>
-                    <?php endforeach; ?>
+        <div class="report-card-header tren-header">
+            <div>
+                <span class="tren-header-title" id="trenHeaderTitle"><?php echo h($initialTitle); ?></span>
+                <small class="tren-header-sub" id="trenHeaderSub"><?php echo h($initialSub); ?></small>
+            </div>
+            <div class="tren-filter-toolbar">
+                <div class="tren-toggle-group" role="group" aria-label="Filter Tampilan Tren">
+                    <button type="button" class="tren-toggle-btn <?php echo $trenDefaultMode === 'bulanan' ? 'active' : ''; ?>" id="btnTrenBulanan" onclick="switchTrenMode('bulanan')">
+                        Bulanan
+                    </button>
+                    <button type="button" class="tren-toggle-btn <?php echo $trenDefaultMode === 'tahunan' ? 'active' : ''; ?>" id="btnTrenTahunan" onclick="switchTrenMode('tahunan')">
+                        Tahunan
+                    </button>
                 </div>
-            <?php endif; ?>
+                <div class="tren-select-container" id="trenYearSelectWrap" style="<?php echo $trenDefaultMode === 'tahunan' ? 'display:none;' : ''; ?>">
+                    <select id="trenYearSelect" class="tren-filter-select" onchange="changeTrenYear(this.value)">
+                        <?php foreach ($trenYearsForSelect as $yr): ?>
+                            <option value="<?php echo $yr; ?>" <?php echo (string)$trenDefaultYear === (string)$yr ? 'selected' : ''; ?>>
+                                Tahun <?php echo $yr; ?> (12 Bulan)
+                            </option>
+                        <?php endforeach; ?>
+                        <option value="periode" <?php echo $trenDefaultYear === 'periode' ? 'selected' : ''; ?>>
+                            Sesuai Periode Laporan (<?php echo h(date('d/m/Y', strtotime($tanggalAwal))) . ' - ' . h(date('d/m/Y', strtotime($tanggalAkhir))); ?>)
+                        </option>
+                    </select>
+                </div>
+                <div class="tren-select-container" id="trenTahunanRangeWrap" style="<?php echo $trenDefaultMode === 'bulanan' ? 'display:none;' : ''; ?>">
+                    <select id="trenTahunanRangeSelect" class="tren-filter-select" onchange="changeTrenTahunanRange(this.value)">
+                        <option value="5" <?php echo $trenDefaultTahunanRange === '5' ? 'selected' : ''; ?>>5 Tahun Terakhir</option>
+                        <option value="10" <?php echo $trenDefaultTahunanRange === '10' ? 'selected' : ''; ?>>10 Tahun Terakhir</option>
+                        <option value="semua" <?php echo $trenDefaultTahunanRange === 'semua' ? 'selected' : ''; ?>>Semua Riwayat Tahun</option>
+                        <option value="periode" <?php echo $trenDefaultTahunanRange === 'periode' ? 'selected' : ''; ?>>
+                            Sesuai Periode (<?php echo h(date('Y', strtotime($tanggalAwal))) . ($startYearPeriod !== $endYearPeriod ? ' - ' . h(date('Y', strtotime($tanggalAkhir))) : ''); ?>)
+                        </option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div class="report-card-body">
+            <div id="trenChartContainer">
+                <?php if (empty($initialTrenItems)): ?>
+                    <div class="empty-report">Belum ada transaksi kas pada periode/filter ini.</div>
+                <?php else: ?>
+                    <div class="chart-wrap <?php echo $isYearlyInitial ? 'is-yearly' : ''; ?>">
+                        <?php foreach ($initialTrenItems as $it): ?>
+                            <?php
+                            $inV = (float)$it['masuk'];
+                            $outV = (float)$it['keluar'];
+                            $diff = $inV - $outV;
+                            $inH = $initialMaxVal > 0 ? ($inV / $initialMaxVal) * 165 : 2;
+                            $outH = $initialMaxVal > 0 ? ($outV / $initialMaxVal) * 165 : 2;
+                            $labelPeriod = $isYearlyInitial ? ('Tahun ' . $it['periode']) : ($it['label'] ?? $it['periode']);
+                            $tooltip = $labelPeriod . " | Masuk: " . rupiah($inV) . " | Keluar: " . rupiah($outV) . " | Bersih: " . ($diff < 0 ? '-' . rupiah(abs($diff)) : rupiah($diff));
+                            ?>
+                            <div class="chart-column <?php echo $isYearlyInitial ? 'is-yearly' : ''; ?>">
+                                <div class="chart-bars" title="<?php echo h($tooltip); ?>">
+                                    <div class="chart-bar in" style="height:<?php echo max(2, $inH); ?>px"></div>
+                                    <div class="chart-bar out" style="height:<?php echo max(2, $outH); ?>px"></div>
+                                </div>
+                                <div class="chart-month"><?php echo h($it['singkat'] ?? $it['periode']); ?></div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+            </div>
+
+            <div class="tren-summary-grid">
+                <div class="tren-summary-card">
+                    <div class="tren-summary-label"><span class="legend-dot legend-in"></span> Total Pemasukan Kas</div>
+                    <div class="tren-summary-val in" id="trenStatMasuk"><?php echo rupiah($initialTotalIn); ?></div>
+                </div>
+                <div class="tren-summary-card">
+                    <div class="tren-summary-label"><span class="legend-dot legend-out"></span> Total Pengeluaran Kas</div>
+                    <div class="tren-summary-val out" id="trenStatKeluar"><?php echo rupiah($initialTotalOut); ?></div>
+                </div>
+                <div class="tren-summary-card">
+                    <div class="tren-summary-label">Arus Kas Bersih</div>
+                    <div class="tren-summary-val net <?php echo $initialNet >= 0 ? 'positive' : 'negative'; ?>" id="trenStatBersih"><?php echo $initialNet < 0 ? '-' . rupiah(abs($initialNet)) : rupiah($initialNet); ?></div>
+                </div>
+            </div>
+
+            <div class="chart-legend" style="margin-top: 14px;">
+                <div class="legend-item"><span class="legend-dot legend-in"></span> Pemasukan Kas</div>
+                <div class="legend-item"><span class="legend-dot legend-out"></span> Pengeluaran Kas</div>
+            </div>
         </div>
     </div>
 
@@ -1282,10 +1587,163 @@ require_once __DIR__ . '/../includes/header.php';
 
 <script>
     const monthlyReportData = <?php echo $monthlyReportDataJson ?: '{}'; ?>;
+    const trenData = <?php echo $trenDataJson ?: '{}'; ?>;
+    let currentTrenMode = '<?php echo $trenDefaultMode; ?>';
+    let currentTrenYear = '<?php echo $trenDefaultYear; ?>';
+    let currentTrenTahunanRange = '<?php echo $trenDefaultTahunanRange; ?>';
+
     function escapeReportText(value) { return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;'); }
     function formatReportMoney(value) { return 'Rp ' + new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(Number(value || 0)); }
+    function formatSignedReportMoney(value) {
+        const num = Number(value || 0);
+        const formatted = 'Rp ' + new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(Math.abs(num));
+        return num < 0 ? '-' + formatted : formatted;
+    }
     function formatReportDate(value) { if (!value) return '-'; const p = String(value).split('-'); return p.length === 3 ? p[2] + '-' + p[1] + '-' + p[0] : escapeReportText(value); }
     function monthTitle(period) { const p = String(period || '').split('-'); const n = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']; return p.length === 2 ? (n[Number(p[1]) - 1] || p[1]) + ' ' + p[0] : (period || '-'); }
+
+    function switchTrenMode(mode) {
+        currentTrenMode = mode;
+        const btnBulanan = document.getElementById('btnTrenBulanan');
+        const btnTahunan = document.getElementById('btnTrenTahunan');
+        const yearWrap = document.getElementById('trenYearSelectWrap');
+        const tahunanWrap = document.getElementById('trenTahunanRangeWrap');
+        
+        if (mode === 'bulanan') {
+            if (btnBulanan) btnBulanan.classList.add('active');
+            if (btnTahunan) btnTahunan.classList.remove('active');
+            if (yearWrap) yearWrap.style.display = '';
+            if (tahunanWrap) tahunanWrap.style.display = 'none';
+        } else {
+            if (btnBulanan) btnBulanan.classList.remove('active');
+            if (btnTahunan) btnTahunan.classList.add('active');
+            if (yearWrap) yearWrap.style.display = 'none';
+            if (tahunanWrap) tahunanWrap.style.display = '';
+        }
+        renderTrenChart();
+    }
+
+    function changeTrenYear(val) {
+        currentTrenYear = val;
+        renderTrenChart();
+    }
+
+    function changeTrenTahunanRange(val) {
+        currentTrenTahunanRange = val;
+        renderTrenChart();
+    }
+
+    function renderTrenChart() {
+        const container = document.getElementById('trenChartContainer');
+        const titleEl = document.getElementById('trenHeaderTitle');
+        const subEl = document.getElementById('trenHeaderSub');
+        const statMasuk = document.getElementById('trenStatMasuk');
+        const statKeluar = document.getElementById('trenStatKeluar');
+        const statBersih = document.getElementById('trenStatBersih');
+        if (!container) return;
+
+        let items = [];
+        const isYearly = (currentTrenMode === 'tahunan');
+
+        if (isYearly) {
+            const allYearly = trenData.yearly || [];
+            const availableYears = trenData.availableYears || [];
+            const maxYear = availableYears.length > 0 ? Math.max(...availableYears) : new Date().getFullYear();
+            const startYearPeriod = parseInt(String(trenData.periodStartYear || maxYear), 10);
+            const endYearPeriod = parseInt(String(trenData.periodEndYear || maxYear), 10);
+
+            if (currentTrenTahunanRange === '5') {
+                const minYear = maxYear - 4;
+                items = allYearly.filter(y => {
+                    const yr = parseInt(y.periode, 10);
+                    return yr >= minYear && yr <= maxYear;
+                });
+                if (titleEl) titleEl.textContent = 'Pemasukan vs Pengeluaran per Tahun';
+                if (subEl) subEl.textContent = 'Perbandingan transaksi kas aktual (5 Tahun Terakhir: ' + minYear + ' - ' + maxYear + ')';
+            } else if (currentTrenTahunanRange === '10') {
+                const minYear = maxYear - 9;
+                items = allYearly.filter(y => {
+                    const yr = parseInt(y.periode, 10);
+                    return yr >= minYear && yr <= maxYear;
+                });
+                if (titleEl) titleEl.textContent = 'Pemasukan vs Pengeluaran per Tahun';
+                if (subEl) subEl.textContent = 'Perbandingan transaksi kas aktual (10 Tahun Terakhir: ' + minYear + ' - ' + maxYear + ')';
+            } else if (currentTrenTahunanRange === 'periode') {
+                items = allYearly.filter(y => {
+                    const yr = parseInt(y.periode, 10);
+                    return yr >= startYearPeriod && yr <= endYearPeriod;
+                });
+                if (titleEl) titleEl.textContent = 'Pemasukan vs Pengeluaran per Tahun';
+                if (subEl) subEl.textContent = 'Perbandingan transaksi kas aktual pada periode laporan (' + startYearPeriod + (startYearPeriod !== endYearPeriod ? ' - ' + endYearPeriod : '') + ')';
+            } else {
+                items = allYearly;
+                if (titleEl) titleEl.textContent = 'Pemasukan vs Pengeluaran per Tahun';
+                if (subEl) subEl.textContent = 'Perbandingan seluruh riwayat transaksi kas aktual tahunan';
+            }
+        } else {
+            if (currentTrenYear === 'periode') {
+                items = trenData.monthlyPeriod || [];
+                if (titleEl) titleEl.textContent = 'Pemasukan vs Pengeluaran per Bulan';
+                if (subEl) subEl.textContent = 'Transaksi kas aktual pada periode laporan (' + (trenData.periodLabel || '') + ')';
+            } else {
+                items = (trenData.monthlyByYear && trenData.monthlyByYear[currentTrenYear]) ? trenData.monthlyByYear[currentTrenYear] : [];
+                if (titleEl) titleEl.textContent = 'Pemasukan vs Pengeluaran per Bulan';
+                if (subEl) subEl.textContent = 'Transaksi kas aktual 12 bulan (Tahun ' + currentTrenYear + ')';
+            }
+        }
+
+        if (!items || items.length === 0) {
+            container.innerHTML = '<div class="empty-report">Belum ada transaksi kas pada periode/filter ini.</div>';
+            if (statMasuk) statMasuk.textContent = 'Rp 0';
+            if (statKeluar) statKeluar.textContent = 'Rp 0';
+            if (statBersih) { statBersih.textContent = 'Rp 0'; statBersih.className = 'tren-summary-val net'; }
+            return;
+        }
+
+        let maxVal = 0;
+        let totalIn = 0;
+        let totalOut = 0;
+
+        items.forEach(it => {
+            const inV = Number(it.masuk || 0);
+            const outV = Number(it.keluar || 0);
+            if (inV > maxVal) maxVal = inV;
+            if (outV > maxVal) maxVal = outV;
+            totalIn += inV;
+            totalOut += outV;
+        });
+
+        const netVal = totalIn - totalOut;
+        if (statMasuk) statMasuk.textContent = formatReportMoney(totalIn);
+        if (statKeluar) statKeluar.textContent = formatReportMoney(totalOut);
+        if (statBersih) {
+            statBersih.textContent = formatSignedReportMoney(netVal);
+            statBersih.className = 'tren-summary-val net ' + (netVal >= 0 ? 'positive' : 'negative');
+        }
+
+        let chartHtml = '<div class="chart-wrap' + (isYearly ? ' is-yearly' : '') + '">';
+        items.forEach(it => {
+            const inVal = Number(it.masuk || 0);
+            const outVal = Number(it.keluar || 0);
+            const diff = inVal - outVal;
+            const inHeight = maxVal > 0 ? (inVal / maxVal) * 165 : 2;
+            const outHeight = maxVal > 0 ? (outVal / maxVal) * 165 : 2;
+
+            const periodTitle = (isYearly ? 'Tahun ' + it.periode : (it.label || it.periode));
+            const tooltip = periodTitle + '\n• Masuk: ' + formatReportMoney(inVal) + '\n• Keluar: ' + formatReportMoney(outVal) + '\n• Bersih: ' + formatSignedReportMoney(diff);
+
+            chartHtml += '<div class="chart-column' + (isYearly ? ' is-yearly' : '') + '">';
+            chartHtml += '  <div class="chart-bars" title="' + escapeReportText(tooltip) + '">';
+            chartHtml += '    <div class="chart-bar in" style="height:' + Math.max(2, inHeight) + 'px"></div>';
+            chartHtml += '    <div class="chart-bar out" style="height:' + Math.max(2, outHeight) + 'px"></div>';
+            chartHtml += '  </div>';
+            chartHtml += '  <div class="chart-month">' + escapeReportText(it.singkat || it.periode) + '</div>';
+            chartHtml += '</div>';
+        });
+        chartHtml += '</div>';
+
+        container.innerHTML = chartHtml;
+    }
     
     function showMonthlyReport(period) {
         const selector = document.getElementById('reportMonth');
