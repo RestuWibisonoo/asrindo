@@ -190,6 +190,7 @@ require_once __DIR__ . '/../includes/header.php';
     .admin-page-header h1 {margin:0; font-size:20px; color:#172b4d;}
 </style>
 
+
 <div class="admin-page-header">
     <div>
         <h1>Mutasi: <?php echo h($rekening['nama_rekening']); ?></h1>
