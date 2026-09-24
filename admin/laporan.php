@@ -186,10 +186,16 @@ $stmt = $pdo->prepare("
         SELECT total,
                (SELECT COALESCE(SUM(nominal), 0) FROM pengeluaran WHERE pembelian_restorasi_id = pr.id AND tanggal <= ?) AS terbayar
         FROM pembelian_restorasi pr WHERE status != 'BATAL' AND tanggal <= ?
+
+        UNION ALL
+
+        SELECT total,
+               (SELECT COALESCE(SUM(nominal), 0) FROM pengeluaran WHERE utang_lainnya_id = ul.id AND tanggal <= ?) AS terbayar
+        FROM utang_lainnya ul WHERE status != 'BATAL' AND tanggal <= ?
     ) AS gabungan
     WHERE (total - terbayar) > 0
 ");
-$stmt->execute([$tanggalAkhir, $tanggalAkhir, $tanggalAkhir, $tanggalAkhir, $tanggalAkhir, $tanggalAkhir]);
+$stmt->execute([$tanggalAkhir, $tanggalAkhir, $tanggalAkhir, $tanggalAkhir, $tanggalAkhir, $tanggalAkhir, $tanggalAkhir, $tanggalAkhir]);
 $hutangPembelian = (float) $stmt->fetchColumn();
 $totalLiabilitas = $hutangPembelian;
 
