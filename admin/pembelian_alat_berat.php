@@ -329,7 +329,7 @@ require __DIR__ . '/../includes/header.php';
                     <?php
                     $sisa = max(0, (float)$purchase['total'] - (float)$purchase['sudah_dibayar']);
                     $status = strtoupper((string)$purchase['status']);
-                    $statusClass = $status === 'SELESAI' ? 'badge-success' : ($status === 'BATAL' ? 'badge-danger' : 'badge-info');
+                    $statusClass = $status === 'SELESAI' ? 'badge-success' : ($status === 'BATAL' ? 'badge-danger' : ($status === 'PENGIRIMAN' ? 'badge-warning' : 'badge-info'));
                     ?>
                     <tr data-id="<?php echo (int)$purchase['id']; ?>">
                         <td><strong><?php echo h($purchase['nomor_pembelian']); ?></strong></td>

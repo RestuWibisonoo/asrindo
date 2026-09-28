@@ -961,7 +961,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($action === 'update_status') {
             $status = strtoupper(trim((string) ($_POST['status'] ?? 'PROSES')));
 
-            if (!in_array($status, ['PROSES', 'SELESAI', 'BATAL'], true)) {
+            if (!in_array($status, ['PROSES', 'PENGIRIMAN', 'SELESAI', 'BATAL'], true)) {
                 throw new RuntimeException('Status pembelian tidak valid.');
             }
 
@@ -1008,6 +1008,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 LIMIT 1
             ");
             $stmt->execute([$status, $id]);
+
+            if ($status === 'PENGIRIMAN') {
+                $stmt = $pdo->prepare("
+                    UPDATE alat_berat
+                    SET status = 'Pengiriman'
+                    WHERE id IN (
+                        SELECT alat_berat_id FROM pembelian_alat_berat_detail WHERE pembelian_id = ?
+                    )
+                    AND UPPER(status) NOT IN ('TERJUAL', 'SOLD')
+                ");
+                $stmt->execute([$id]);
+            } elseif ($status === 'SELESAI') {
+                $stmt = $pdo->prepare("
+                    UPDATE alat_berat
+                    SET status = 'Tersedia'
+                    WHERE id IN (
+                        SELECT alat_berat_id FROM pembelian_alat_berat_detail WHERE pembelian_id = ?
+                    )
+                    AND UPPER(status) = 'PENGIRIMAN'
+                ");
+                $stmt->execute([$id]);
+            }
 
             $pdo->commit();
             redirectDetail($id, 'success', 'Status pembelian berhasil diubah menjadi ' . $status . '.');
@@ -1765,7 +1787,7 @@ require __DIR__ . '/../includes/header.php';
         </div>
         <?php
         $status = strtoupper((string) $purchase['status']);
-        $statusClass = $status === 'SELESAI' ? 'badge-success' : ($status === 'BATAL' ? 'badge-danger' : 'badge-info');
+        $statusClass = $status === 'SELESAI' ? 'badge-success' : ($status === 'BATAL' ? 'badge-danger' : ($status === 'PENGIRIMAN' ? 'badge-warning' : 'badge-info'));
         ?>
         <span
             class="purchase-badge large-badge <?php echo $statusClass; ?>"><?php echo h($purchase['status']); ?></span>
@@ -1965,6 +1987,7 @@ require __DIR__ . '/../includes/header.php';
             <input type="hidden" name="pembelian_id" value="<?php echo (int) $id; ?>">
             <select name="status" class="status-select">
                 <option value="PROSES" <?php echo $status === 'PROSES' ? 'selected' : ''; ?>>PROSES</option>
+                <option value="PENGIRIMAN" <?php echo $status === 'PENGIRIMAN' ? 'selected' : ''; ?>>PENGIRIMAN</option>
                 <option value="SELESAI" <?php echo $status === 'SELESAI' ? 'selected' : ''; ?>>SELESAI</option>
                 <option value="BATAL" <?php echo $status === 'BATAL' ? 'selected' : ''; ?>>BATAL</option>
             </select>

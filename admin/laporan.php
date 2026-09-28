@@ -388,25 +388,73 @@ if ($bebanPenyusutanPeriode > 0) {
 */
 $positionUnitRows = [];
 $positionSparepartRows = [];
+$excavatorPengirimanRows = [];
 try {
-    $positionUnits = $pdo->query("SELECT id, kode, tipe FROM alat_berat ORDER BY kode ASC")->fetchAll(PDO::FETCH_ASSOC);
-    $hppByUnit = [];
+    $positionUnits = $pdo->query("SELECT id, kode, tipe, status FROM alat_berat ORDER BY kode ASC")->fetchAll(PDO::FETCH_ASSOC);
+    $unitMap = [];
+    foreach ($positionUnits as $u) {
+        $unitMap[(int)$u['id']] = $u;
+    }
+
     $stmt = $pdo->prepare("
-        SELECT d.alat_berat_id, d.harga_beli + (COALESCE(p.biaya_bea_cukai, 0) + COALESCE(p.biaya_pengiriman, 0) + COALESCE(p.biaya_lain, 0)) / NULLIF((SELECT COUNT(*) FROM pembelian_alat_berat_detail d2 WHERE d2.pembelian_id = p.id), 0) AS hpp
+        SELECT d.alat_berat_id, 
+               p.id AS pembelian_id,
+               p.nomor_pembelian,
+               p.status AS status_pembelian,
+               d.harga_beli + (COALESCE(p.biaya_bea_cukai, 0) + COALESCE(p.biaya_pengiriman, 0) + COALESCE(p.biaya_lain, 0)) / NULLIF((SELECT COUNT(*) FROM pembelian_alat_berat_detail d2 WHERE d2.pembelian_id = p.id), 0) AS hpp
         FROM pembelian_alat_berat_detail d INNER JOIN pembelian_alat_berat p ON p.id = d.pembelian_id
         WHERE UPPER(COALESCE(p.status, '')) <> 'BATAL' AND p.tanggal <= ?
           AND NOT EXISTS (SELECT 1 FROM penjualan_detail sd INNER JOIN penjualan sp ON sp.id = sd.penjualan_id WHERE sd.alat_berat_id = d.alat_berat_id AND sp.tanggal <= ? AND UPPER(COALESCE(sp.status, '')) NOT IN ('DRAFT', 'BATAL'))
     ");
     $stmt->execute([$tanggalAkhir, $tanggalAkhir]);
-    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-        $hppByUnit[(int)$row['alat_berat_id']] = (float) $row['hpp'];
-    }
-    foreach ($positionUnits as $unit) {
-        $unitId = (int) $unit['id'];
-        if (array_key_exists($unitId, $hppByUnit)) {
-            $positionUnitRows[] = ['label' => $unit['kode'], 'nominal' => $hppByUnit[$unitId]];
+    $purchasedUnitRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    foreach ($purchasedUnitRows as $pRow) {
+        $uId = (int) $pRow['alat_berat_id'];
+        $uData = $unitMap[$uId] ?? ['kode' => 'EXC-' . $uId, 'tipe' => 'Excavator', 'status' => ''];
+        $isPengiriman = (strtoupper((string)($pRow['status_pembelian'] ?? '')) === 'PENGIRIMAN')
+            || in_array(strtoupper(trim((string)($uData['status'] ?? ''))), ['PENGIRIMAN', 'DALAM PENGIRIMAN'], true);
+
+        $nominalHpp = (float) $pRow['hpp'];
+
+        if ($isPengiriman) {
+            $excavatorPengirimanRows[] = [
+                'alat_berat_id' => $uId,
+                'kode' => $uData['kode'],
+                'tipe' => $uData['tipe'],
+                'label' => $uData['kode'] . ($uData['tipe'] ? ' (' . $uData['tipe'] . ')' : ''),
+                'nomor_pembelian' => $pRow['nomor_pembelian'],
+                'nominal' => $nominalHpp
+            ];
+        } else {
+            $positionUnitRows[] = [
+                'label' => $uData['kode'],
+                'nominal' => $nominalHpp
+            ];
         }
     }
+
+    $stmtPengirimanOnly = $pdo->prepare("
+        SELECT p.id, p.nomor_pembelian, p.total
+        FROM pembelian_alat_berat p
+        WHERE UPPER(COALESCE(p.status, '')) = 'PENGIRIMAN' AND p.tanggal <= ?
+          AND NOT EXISTS (SELECT 1 FROM pembelian_alat_berat_detail d WHERE d.pembelian_id = p.id)
+    ");
+    $stmtPengirimanOnly->execute([$tanggalAkhir]);
+    foreach ($stmtPengirimanOnly->fetchAll(PDO::FETCH_ASSOC) as $noDetail) {
+        $excavatorPengirimanRows[] = [
+            'alat_berat_id' => 0,
+            'kode' => $noDetail['nomor_pembelian'],
+            'tipe' => 'Pembelian Alat Berat',
+            'label' => $noDetail['nomor_pembelian'],
+            'nomor_pembelian' => $noDetail['nomor_pembelian'],
+            'nominal' => (float)$noDetail['total']
+        ];
+    }
+
+    usort($positionUnitRows, function ($a, $b) {
+        return strcmp($a['label'], $b['label']);
+    });
 
     $stmt = $pdo->prepare("
         SELECT s.id, s.kode, s.stok, COALESCE(pq.qty_beli, 0) AS qty_beli, COALESCE(pq.nilai_beli, 0) AS nilai_beli, COALESCE(sq.qty_jual, 0) AS qty_jual
@@ -429,6 +477,7 @@ $positionUnitTotal = array_sum(array_column($positionUnitRows, 'nominal'));
 $positionSparepartTotal = 0.0;
 foreach ($positionSparepartRows as $row) { $positionSparepartTotal += (float) $row['stok'] * (float) $row['harga_terakhir']; }
 $persediaanTotal = $positionUnitTotal + $positionSparepartTotal;
+$totalExcavatorPengiriman = array_sum(array_column($excavatorPengirimanRows, 'nominal'));
 
 
 // Kalkulasi Ekuitas Laba Rugi untuk Neraca
@@ -943,12 +992,15 @@ require_once __DIR__ . '/../includes/header.php';
     .statement-title { padding: 13px 16px; border-bottom: 1px solid #dce3eb; text-align: center; font-size: 14px; font-weight: 700; color: #172b4d; }
     .statement-title span { display: block; margin-top: 3px; color: #8390a3; font-size: 11px; font-weight: 400; }
     .statement-table { width: 100%; border-collapse: collapse; }
-    .statement-table td { padding: 9px 10px; border-bottom: 1px solid #e8edf2; font-size: 12px; vertical-align: top; }
+    .statement-table th { padding: 8px 10px; border-bottom: 1px solid #dce3eb; font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px; color: #526b8d; text-align: left; }
+    .statement-table th:last-child { text-align: right; }
+    .statement-table td { padding: 9px 10px; border-bottom: 1px solid #e8edf2; font-size: 12px; vertical-align: middle; }
     .statement-table td:last-child { text-align: right; white-space: nowrap; font-weight: 600; }
-    .statement-table .section td { background: #f5f7fa; color: #526b8d; font-weight: 700; border-bottom: 1px solid #dce3eb; text-align: left !important; }
+    .statement-table .section td, .statement-table .section th { background: #f5f7fa; color: #526b8d; font-weight: 700; border-bottom: 1px solid #dce3eb; text-align: left !important; }
     .statement-table .total td { font-weight: 700; border-top: 1px solid #dce3eb; background: #f7f9fb; }
     .statement-table .grand-total td { font-weight: 700; border-top: 2px solid #dce3eb; background: #eef3f8; }
     .statement-table .indent td:first-child { padding-left: 20px; }
+    .col-keterangan { color: #64748b; font-size: 11px; font-weight: normal; }
     .statement-print { margin: 24px 0; }
     
     .laba-rugi-print-container, .monthly-print-container { display: none; }
@@ -1180,6 +1232,17 @@ require_once __DIR__ . '/../includes/header.php';
                             <td>Setoran Modal</td>
                             <td><?php echo $modalAwal == 0 ? '-' : rupiah($modalAwal); ?></td>
                         </tr>
+                        <?php if ($totalExcavatorPengiriman > 0): ?>
+                            <tr class="indent">
+                                <td>Pembelian Excavator (Masih Dikirim)<?php if (!empty($excavatorPengirimanRows)): ?> <small style="color: #b45309; font-weight: 600;">(<?php echo h(implode(', ', array_column($excavatorPengirimanRows, 'kode'))); ?>)</small><?php endif; ?></td>
+                                <td><?php echo rupiah($totalExcavatorPengiriman); ?></td>
+                            </tr>
+                        <?php else: ?>
+                            <tr class="indent">
+                                <td>Pembelian Excavator (Masih Dikirim)</td>
+                                <td>-</td>
+                            </tr>
+                        <?php endif; ?>
                         <tr class="indent">
                             <td>Laba Bersih</td>
                             <td><?php echo rupiah($labaRugiPeriode); ?></td>
