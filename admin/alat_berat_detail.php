@@ -11,7 +11,7 @@ if (!isset($_SESSION['admin_id'])) {
 require_once __DIR__ . '/../config/koneksi.php';
 
 $pdo = getPDO();
-$id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+$id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT) ?: filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT);
 
 if (!$id) {
     header('Location: alat_berat.php');
@@ -43,7 +43,7 @@ function badgeClass($v): string
         return 'success';
     if ($v === 'PERBAIKAN')
         return 'warning';
-    if ($v === 'DISEWAKAN')
+    if (in_array($v, ['DISEWAKAN', 'PENGIRIMAN'], true))
         return 'info';
     if ($v === 'TERJUAL')
         return 'danger';
@@ -133,7 +133,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $lokasi = trim((string) ($_POST['lokasi'] ?? ''));
 
             if ($kode === '' || $tipe === '' || $nomorRangka === '') {
-                throw new RuntimeException('Kode, tipe, dan nomor rangka wajib diisi.');
+                throw new RuntimeException('Kode, tipe, dan serial number wajib diisi.');
             }
 
             $stmt = $pdo->prepare("
@@ -1694,7 +1694,7 @@ require __DIR__ . '/../includes/header.php';
                         class="value"><?php echo h($unit['tipe']); ?></span></div>
                 <div class="detail-field"><span class="label">Kondisi Unit</span><span class="value"><span
                             class="unit-badge default"><?php echo h($unit['kondisi']); ?></span></span></div>
-                <div class="detail-field"><span class="label">Nomor Rangka</span><span
+                <div class="detail-field"><span class="label">Serial Number</span><span
                         class="value rangka"><?php echo h($unit['nomor_rangka']); ?></span></div>
                 <div class="detail-field"><span class="label">Status Unit</span><span class="value"><span
                             class="unit-badge <?php echo badgeClass($unit['status']); ?>"><?php echo h($unit['status']); ?></span></span>
@@ -2104,7 +2104,7 @@ require __DIR__ . '/../includes/header.php';
                             value="<?php echo h($unit['kode']); ?>"></div>
                     <div class="form-field"><label>Tipe *</label><input name="tipe" required
                             value="<?php echo h($unit['tipe']); ?>"></div>
-                    <div class="form-field"><label>Nomor Rangka *</label><input name="nomor_rangka" required
+                    <div class="form-field"><label>Serial Number *</label><input name="nomor_rangka" required
                             value="<?php echo h($unit['nomor_rangka']); ?>"></div>
                     <div class="form-field"><label>Tahun Pembuatan</label><input name="tahun_pembuatan"
                             value="<?php echo h($unit['tahun_pembuatan']); ?>"></div>
@@ -2115,7 +2115,7 @@ require __DIR__ . '/../includes/header.php';
                                 </option><?php endforeach; ?>
                         </select></div>
                     <div class="form-field"><label>Status</label><select
-                            name="status"><?php foreach (['Tersedia', 'Siap Jual', 'Perbaikan', 'Disewakan', 'Terjual'] as $x): ?>
+                            name="status"><?php foreach (['Tersedia', 'Siap Jual', 'Perbaikan', 'Disewakan', 'Pengiriman', 'Terjual'] as $x): ?>
                                 <option value="<?php echo h($x); ?>" <?php echo strcasecmp((string) $unit['status'], $x) === 0 ? 'selected' : ''; ?>><?php echo h($x); ?>
                                 </option><?php endforeach; ?>
                         </select></div>
