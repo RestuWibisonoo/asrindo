@@ -41,10 +41,6 @@ function statusClass($status): string
         return 'badge-info';
     }
 
-    if (in_array($status, ['PENGIRIMAN', 'DALAM PENGIRIMAN'], true)) {
-        return 'badge-info';
-    }
-
     if (in_array($status, ['TERJUAL', 'SOLD'], true)) {
         return 'badge-danger';
     }
@@ -95,7 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $lokasi = trim((string)($_POST['lokasi'] ?? ''));
 
             if ($kode === '' || $tipe === '' || $nomorRangka === '') {
-                throw new RuntimeException('Kode, tipe, dan serial number wajib diisi.');
+                throw new RuntimeException('Kode, tipe, dan nomor rangka wajib diisi.');
             }
 
             if ($tahun !== '' && !preg_match('/^\d{4}$/', $tahun)) {
@@ -103,7 +99,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             $allowedKondisi = ['Baru', 'Bekas'];
-            $allowedStatus = ['Tersedia', 'Siap Jual', 'Perbaikan', 'Disewakan', 'Pengiriman', 'Terjual'];
+            $allowedStatus = ['Tersedia', 'Siap Jual', 'Perbaikan', 'Disewakan', 'Terjual'];
 
             if (!in_array($kondisi, $allowedKondisi, true)) {
                 throw new RuntimeException('Kondisi unit tidak valid.');
@@ -118,7 +114,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $duplicate = $stmt->fetch();
 
             if ($duplicate) {
-                throw new RuntimeException('Kode atau serial number sudah digunakan oleh unit lain.');
+                throw new RuntimeException('Kode atau nomor rangka sudah digunakan oleh unit lain.');
             }
 
             $stmt = $pdo->prepare(''
@@ -254,7 +250,7 @@ try {
 /* Total Nilai Inventori = total seluruh HPP Unit yang ditampilkan. */
 $totalNilaiInventori = array_sum($hppByUnit);
 
-$statuses = ['Disewakan', 'Pengiriman', 'Perbaikan', 'Siap Jual', 'Terjual', 'Tersedia'];
+$statuses = [];
 foreach ($units as $unit) {
     $status = trim((string)$unit['status']);
     if ($status !== '' && !in_array($status, $statuses, true)) {
@@ -729,7 +725,7 @@ require __DIR__ . '/../includes/header.php';
             <input
                 type="search"
                 id="globalSearch"
-                placeholder="Cari kode, tipe, serial number, lokasi..."
+                placeholder="Cari kode, tipe, nomor rangka, lokasi..."
                 autocomplete="off"
             >
         </div>
@@ -751,7 +747,7 @@ require __DIR__ . '/../includes/header.php';
                 <tr>
                     <th class="sortable" data-column="0">Kode</th>
                     <th class="sortable" data-column="1">Tipe</th>
-                    <th class="sortable" data-column="2">Serial Number</th>
+                    <th class="sortable" data-column="2">Nomor Rangka</th>
                     <th class="sortable" data-column="3">HPP Unit</th>
                     <th class="sortable" data-column="4">Tahun Pembuatan</th>
                     <th class="sortable" data-column="5">Kondisi</th>
@@ -763,7 +759,7 @@ require __DIR__ . '/../includes/header.php';
                 <tr class="alat-filter-row">
                     <th><input type="text" class="column-filter" data-filter-column="0" placeholder="Filter kode"></th>
                     <th><input type="text" class="column-filter" data-filter-column="1" placeholder="Filter tipe"></th>
-                    <th><input type="text" class="column-filter" data-filter-column="2" placeholder="Filter serial number"></th>
+                    <th><input type="text" class="column-filter" data-filter-column="2" placeholder="Filter nomor rangka"></th>
                     <th><input type="text" class="column-filter" data-filter-column="3" placeholder="Filter HPP"></th>
                     <th><input type="text" class="column-filter" data-filter-column="4" placeholder="Filter tahun"></th>
                     <th><input type="text" class="column-filter" data-filter-column="5" placeholder="Filter kondisi"></th>
@@ -856,7 +852,7 @@ require __DIR__ . '/../includes/header.php';
                     </div>
 
                     <div class="alat-form-field">
-                        <label for="nomor_rangka">Serial Number *</label>
+                        <label for="nomor_rangka">Nomor Rangka *</label>
                         <input type="text" id="nomor_rangka" name="nomor_rangka" required value="<?php echo h($_POST['nomor_rangka'] ?? ''); ?>">
                     </div>
 
@@ -878,7 +874,7 @@ require __DIR__ . '/../includes/header.php';
                         <label for="status">Status *</label>
                         <?php $selectedStatus = (string)($_POST['status'] ?? 'Tersedia'); ?>
                         <select id="status" name="status" required>
-                            <?php foreach (['Tersedia', 'Siap Jual', 'Perbaikan', 'Disewakan', 'Pengiriman', 'Terjual'] as $statusOption): ?>
+                            <?php foreach (['Tersedia', 'Siap Jual', 'Perbaikan', 'Disewakan', 'Terjual'] as $statusOption): ?>
                                 <option value="<?php echo h($statusOption); ?>" <?php echo $selectedStatus === $statusOption ? 'selected' : ''; ?>>
                                     <?php echo h($statusOption); ?>
                                 </option>
