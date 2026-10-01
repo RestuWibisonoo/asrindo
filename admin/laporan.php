@@ -328,12 +328,6 @@ $stmt = $pdo->prepare("
 $stmt->execute([$tanggalAwal, $tanggalAkhir]);
 $incomeDetailRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-foreach ($incomeDetailRows as $row) {
-    if ($row['sumber'] !== 'PENJUALAN') {
-        $profitIncomeRows[] = ['label' => $row['kategori_nama'] ?: ($row['jenis_pembayaran'] ?: 'Pendapatan Non Penjualan'), 'nominal' => (float) $row['nominal']];
-    }
-}
-
 // HPP Alat Berat
 $stmt = $pdo->prepare("SELECT p.nomor_penjualan, ab.kode, pd.hpp FROM penjualan p INNER JOIN penjualan_detail pd ON pd.penjualan_id = p.id LEFT JOIN alat_berat ab ON ab.id = pd.alat_berat_id WHERE p.tanggal BETWEEN ? AND ? AND UPPER(COALESCE(p.status, '')) NOT IN ('DRAFT', 'BATAL') AND COALESCE(pd.hpp, 0) > 0 ORDER BY p.tanggal ASC, p.id ASC");
 $stmt->execute([$tanggalAwal, $tanggalAkhir]);
@@ -518,7 +512,7 @@ try {
             SELECT DATE_FORMAT(p.tanggal, '%Y-%m') AS periode, COALESCE(SUM(pd.subtotal), 0) AS penjualan, 0 AS non_penjualan, 0 AS pemasukan_kas, COALESCE(SUM(pd.hpp), 0) AS hpp, 0 AS belanja_pembelian_kas, 0 AS modal_aset, 0 AS beban_operasional, 0 AS pengeluaran_lainnya, 0 AS pengeluaran_kas
             FROM penjualan_sparepart p INNER JOIN penjualan_sparepart_detail pd ON pd.penjualan_id = p.id WHERE p.tanggal BETWEEN ? AND ? AND UPPER(COALESCE(p.status, '')) NOT IN ('DRAFT', 'BATAL') GROUP BY p.id, DATE_FORMAT(p.tanggal, '%Y-%m')
             UNION ALL
-            SELECT DATE_FORMAT(pm.tanggal, '%Y-%m'), 0, CASE WHEN pm.sumber = 'NON_PENJUALAN' THEN pm.nominal ELSE 0 END, pm.nominal, 0,0,0,0,0,0 FROM pemasukan pm WHERE pm.tanggal BETWEEN ? AND ?
+            SELECT DATE_FORMAT(pm.tanggal, '%Y-%m'), 0, 0, CASE WHEN pm.sumber = 'PENJUALAN' THEN pm.nominal ELSE 0 END, 0,0,0,0,0,0 FROM pemasukan pm WHERE pm.tanggal BETWEEN ? AND ? AND pm.sumber = 'PENJUALAN'
             UNION ALL
             SELECT DATE_FORMAT(pe.tanggal, '%Y-%m'), 0,0,0,0, CASE WHEN pe.sumber = 'PEMBELIAN' THEN pe.nominal ELSE 0 END, CASE WHEN pe.sumber = 'NON_PEMBELIAN' AND COALESCE(k.kelompok_laporan, '') = 'MODAL_ASET' THEN pe.nominal ELSE 0 END, CASE WHEN pe.sumber = 'NON_PEMBELIAN' AND COALESCE(k.kelompok_laporan, '') = 'BEBAN_OPERASIONAL' THEN pe.nominal ELSE 0 END, CASE WHEN pe.sumber = 'NON_PEMBELIAN' AND COALESCE(k.kelompok_laporan, '') NOT IN ('MODAL_ASET', 'BEBAN_OPERASIONAL') THEN pe.nominal ELSE 0 END, pe.nominal
             FROM pengeluaran pe LEFT JOIN kategori_keuangan k ON k.id = pe.kategori_id WHERE pe.tanggal BETWEEN ? AND ?
@@ -562,12 +556,6 @@ try {
         if (isset($monthlyReportData[$row['periode']])) { $monthlyReportData[$row['periode']]['pendapatan_penjualan'][] = ['label' => 'Penjualan Sparepart', 'nomor' => '', 'tanggal' => '', 'nominal' => (float) $row['nominal']]; }
     }
 } catch (Throwable $e) {}
-
-foreach ($incomeDetailRows as $row) {
-    $periode = (string) $row['periode'];
-    if ($row['sumber'] === 'PENJUALAN' || !isset($monthlyReportData[$periode])) continue;
-    $monthlyReportData[$periode]['pendapatan_non_penjualan'][] = ['label' => $row['kategori_nama'] ?: ($row['jenis_pembayaran'] ?: 'Pendapatan Non Penjualan'), 'nomor' => $row['nomor'], 'tanggal' => $row['tanggal'], 'nominal' => (float) $row['nominal'], 'metode' => $row['metode_pembayaran'], 'referensi' => $row['referensi']];
-}
 
 // HPP Bulanan
 $stmt = $pdo->prepare("SELECT p.tanggal, DATE_FORMAT(p.tanggal,'%Y-%m') periode, ab.kode, pd.hpp nominal FROM penjualan p INNER JOIN penjualan_detail pd ON pd.penjualan_id=p.id LEFT JOIN alat_berat ab ON ab.id=pd.alat_berat_id WHERE p.tanggal BETWEEN ? AND ? AND UPPER(COALESCE(p.status,'')) NOT IN ('DRAFT','BATAL') AND COALESCE(pd.hpp,0)>0 ORDER BY p.tanggal,p.id,pd.id");
@@ -1525,7 +1513,6 @@ require_once __DIR__ . '/../includes/header.php';
                         <tr>
                             <th>Bulan</th>
                             <th class="right">Pendapatan Penjualan</th>
-                            <th class="right">Pendapatan Non Penjualan</th>
                             <th class="right">Total Pendapatan</th>
                             <th class="right">HPP</th>
                             <th class="right">Laba Kotor</th>
@@ -1540,7 +1527,7 @@ require_once __DIR__ . '/../includes/header.php';
                     <tbody>
                         <?php foreach ($monthlyRows as $monthly): ?>
                             <?php
-                            $monthIncome = (float) $monthly['penjualan'] + (float) $monthly['non_penjualan'];
+                            $monthIncome = (float) $monthly['penjualan'];
                             $monthGrossProfit = $monthIncome - (float) $monthly['hpp'];
                             $monthCashOut = (float) $monthly['pengeluaran_kas'];
                             $monthCashNet = (float) $monthly['pemasukan_kas'] - $monthCashOut;
@@ -1548,7 +1535,6 @@ require_once __DIR__ . '/../includes/header.php';
                             <tr>
                                 <td><strong><?php echo h(date('F Y', strtotime($monthly['periode'] . '-01'))); ?></strong><div class="report-note" style="margin-top:2px"><?php echo h($monthly['periode']); ?></div></td>
                                 <td class="money"><?php echo rupiah($monthly['penjualan']); ?></td>
-                                <td class="money"><?php echo rupiah($monthly['non_penjualan']); ?></td>
                                 <td class="money"><strong><?php echo rupiah($monthIncome); ?></strong></td>
                                 <td class="money"><?php echo rupiah($monthly['hpp']); ?></td>
                                 <td class="money"><strong><?php echo rupiah($monthGrossProfit); ?></strong></td>

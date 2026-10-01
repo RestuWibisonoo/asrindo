@@ -86,6 +86,85 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $error = 'Gagal menyimpan data utang: ' . $e->getMessage();
             }
         }
+    } elseif ($action === 'edit_utang') {
+        $id = filter_var($_POST['utang_id'] ?? null, FILTER_VALIDATE_INT);
+        $nomor_referensi = trim($_POST['nomor_referensi'] ?? '');
+        $kreditur = trim($_POST['kreditur'] ?? '');
+        $kategoriInput = trim((string)($_POST['kategori'] ?? ''));
+        $kategori = $kategoriInput !== '' ? strtoupper(str_replace(' ', '_', $kategoriInput)) : 'LAINNYA';
+        $tanggal = trim($_POST['tanggal'] ?? '');
+        $jatuh_tempo = trim($_POST['jatuh_tempo'] ?? '');
+        $total = (float) str_replace(['Rp', '.', ' '], '', $_POST['total'] ?? '0');
+        $keterangan = trim($_POST['keterangan'] ?? '');
+
+        if (!$id || $nomor_referensi === '' || $kreditur === '' || $tanggal === '' || $total <= 0) {
+            $error = 'Data utang yang ingin diubah tidak valid.';
+        } else {
+            try {
+                $pdo->beginTransaction();
+                $stmt = $pdo->prepare("SELECT id, status FROM utang_lainnya WHERE id = ? FOR UPDATE");
+                $stmt->execute([$id]);
+                $utang = $stmt->fetch(PDO::FETCH_ASSOC);
+                if (!$utang) throw new RuntimeException('Utang tidak ditemukan.');
+                if ($utang['status'] === 'BATAL') throw new RuntimeException('Utang yang sudah dibatalkan tidak dapat diubah.');
+
+                $stmt = $pdo->prepare("SELECT COUNT(*) FROM pengeluaran WHERE utang_lainnya_id = ?");
+                $stmt->execute([$id]);
+                if ((int) $stmt->fetchColumn() > 0) {
+                    throw new RuntimeException('Utang yang sudah dibayar tidak dapat diubah.');
+                }
+
+                $stmt = $pdo->prepare("UPDATE utang_lainnya SET nomor_referensi = ?, kreditur = ?, kategori = ?, tanggal = ?, jatuh_tempo = ?, total = ?, keterangan = ?, status = 'BELUM_LUNAS' WHERE id = ?");
+                $stmt->execute([$nomor_referensi, $kreditur, $kategori, $tanggal, $jatuh_tempo !== '' ? $jatuh_tempo : null, $total, $keterangan, $id]);
+
+                $pdo->commit();
+                $success = 'Data utang berhasil diubah.';
+            } catch (Exception $e) {
+                $pdo->rollBack();
+                $error = 'Gagal mengubah data utang: ' . $e->getMessage();
+            }
+        }
+    } elseif ($action === 'cancel_utang' || $action === 'delete_utang') {
+        $id = filter_var($_POST['utang_id'] ?? null, FILTER_VALIDATE_INT);
+        if (!$id) {
+            $error = 'ID utang tidak valid.';
+        } else {
+            try {
+                $pdo->beginTransaction();
+                $stmt = $pdo->prepare("SELECT id, nomor_referensi, kreditur, status FROM utang_lainnya WHERE id = ? FOR UPDATE");
+                $stmt->execute([$id]);
+                $utang = $stmt->fetch(PDO::FETCH_ASSOC);
+                if (!$utang) throw new RuntimeException('Utang tidak ditemukan.');
+
+                if ($action === 'cancel_utang') {
+                    if ($utang['status'] === 'BATAL') throw new RuntimeException('Utang sudah dibatalkan.');
+
+                    $stmt = $pdo->prepare("SELECT COUNT(*) FROM pengeluaran WHERE utang_lainnya_id = ?");
+                    $stmt->execute([$id]);
+                    if ((int) $stmt->fetchColumn() > 0) {
+                        throw new RuntimeException('Utang yang sudah dibayar tidak dapat dibatalkan.');
+                    }
+
+                    $stmt = $pdo->prepare("UPDATE utang_lainnya SET status = 'BATAL' WHERE id = ?");
+                    $stmt->execute([$id]);
+
+                    $stmt = $pdo->prepare("DELETE FROM pemasukan WHERE sumber = 'NON_PENJUALAN' AND referensi = ? AND keterangan LIKE ?");
+                    $stmt->execute([$utang['nomor_referensi'], 'Penerimaan utang manual dari ' . $utang['kreditur'] . '%']);
+                    $success = 'Utang manual berhasil dibatalkan.';
+                } else {
+                    if ($utang['status'] !== 'BATAL') throw new RuntimeException('Utang harus dibatalkan terlebih dahulu.');
+
+                    $stmt = $pdo->prepare("DELETE FROM utang_lainnya WHERE id = ?");
+                    $stmt->execute([$id]);
+                    $success = 'Utang manual berhasil dihapus permanen.';
+                }
+
+                $pdo->commit();
+            } catch (Exception $e) {
+                $pdo->rollBack();
+                $error = 'Gagal memproses utang: ' . $e->getMessage();
+            }
+        }
     } elseif ($action === 'pay_utang') {
         $pay_id = filter_var($_POST['utang_id'] ?? null, FILTER_VALIDATE_INT);
         $tanggal = trim($_POST['tanggal'] ?? date('Y-m-d'));
@@ -184,7 +263,11 @@ $sql = "SELECT * FROM (
                 s.nama AS nama_supplier,
                 pab.total,
                 COALESCE((SELECT SUM(nominal) FROM pembelian_pembayaran WHERE pembelian_alat_berat_id = pab.id AND status = 'PAID'), 0) AS terbayar,
-                (SELECT MIN(tanggal_jatuh_tempo) FROM pembelian_pembayaran WHERE pembelian_alat_berat_id = pab.id AND status = 'BELUM_BAYAR') AS jatuh_tempo_terdekat
+                (SELECT MIN(tanggal_jatuh_tempo) FROM pembelian_pembayaran WHERE pembelian_alat_berat_id = pab.id AND status = 'BELUM_BAYAR') AS jatuh_tempo_terdekat,
+                NULL AS manual_id,
+                NULL AS keterangan,
+                pab.status AS status,
+                'purchase' AS source_type
             FROM pembelian_alat_berat pab
             LEFT JOIN supplier s ON pab.supplier_id = s.id
             WHERE pab.status != 'BATAL'
@@ -200,7 +283,11 @@ $sql = "SELECT * FROM (
                 s.nama AS nama_supplier,
                 psp.total,
                 COALESCE((SELECT SUM(nominal) FROM pengeluaran WHERE pembelian_sparepart_id = psp.id), 0) AS terbayar,
-                (SELECT MIN(tanggal_jatuh_tempo) FROM pembelian_pembayaran WHERE pembelian_sparepart_id = psp.id AND status = 'BELUM_BAYAR') AS jatuh_tempo_terdekat
+                (SELECT MIN(tanggal_jatuh_tempo) FROM pembelian_pembayaran WHERE pembelian_sparepart_id = psp.id AND status = 'BELUM_BAYAR') AS jatuh_tempo_terdekat,
+                NULL AS manual_id,
+                NULL AS keterangan,
+                psp.status AS status,
+                'purchase' AS source_type
             FROM pembelian_sparepart psp
             LEFT JOIN supplier s ON psp.supplier_id = s.id
             WHERE psp.status != 'BATAL'
@@ -216,7 +303,11 @@ $sql = "SELECT * FROM (
                 s.nama AS nama_supplier,
                 pr.total,
                 COALESCE((SELECT SUM(nominal) FROM pengeluaran WHERE pembelian_restorasi_id = pr.id), 0) AS terbayar,
-                NULL AS jatuh_tempo_terdekat
+                NULL AS jatuh_tempo_terdekat,
+                NULL AS manual_id,
+                NULL AS keterangan,
+                pr.status AS status,
+                'purchase' AS source_type
             FROM pembelian_restorasi pr
             LEFT JOIN supplier s ON pr.supplier_id = s.id
             WHERE pr.status != 'BATAL'
@@ -232,11 +323,14 @@ $sql = "SELECT * FROM (
                 ul.kreditur AS nama_supplier,
                 ul.total,
                 COALESCE((SELECT SUM(nominal) FROM pengeluaran WHERE utang_lainnya_id = ul.id), 0) AS terbayar,
-                ul.jatuh_tempo AS jatuh_tempo_terdekat
+                ul.jatuh_tempo AS jatuh_tempo_terdekat,
+                ul.id AS manual_id,
+                ul.keterangan AS keterangan,
+                ul.status AS status,
+                'manual' AS source_type
             FROM utang_lainnya ul
-            WHERE ul.status != 'BATAL'
         ) AS gabungan
-        WHERE (total - terbayar) > 0
+        WHERE ((status != 'BATAL' AND (total - terbayar) > 0) OR (source_type = 'manual' AND status = 'BATAL'))
         ORDER BY COALESCE(jatuh_tempo_terdekat, '9999-12-31') ASC, tanggal ASC";
 
 $stmt = $pdo->prepare($sql);
@@ -246,6 +340,9 @@ $liabilitas = $stmt->fetchAll(PDO::FETCH_ASSOC);
 // Hitung total sisa utang dari keseluruhan pembelian
 $totalUtang = 0.0;
 foreach ($liabilitas as $row) {
+    if (($row['status'] ?? '') === 'BATAL') {
+        continue;
+    }
     $sisa = (float) $row['total'] - (float) $row['terbayar'];
     $totalUtang += $sisa;
 }
@@ -546,6 +643,36 @@ require __DIR__ . '/../includes/header.php';
     .btn-secondary:hover {
         background: #f1f4f9;
     }
+
+    .btn-small {
+        padding: 5px 8px;
+        font-size: 11px;
+        line-height: 1.2;
+    }
+
+    .btn-danger {
+        border: 1px solid #ef4444;
+        background: #fff;
+        color: #b91c1c;
+        border-radius: 4px;
+        padding: 5px 8px;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 11px;
+        line-height: 1.2;
+    }
+
+    .btn-danger:hover {
+        background: #fef2f2;
+    }
+
+    .action-stack {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        flex-wrap: wrap;
+    }
 </style>
 
 <div>
@@ -612,14 +739,14 @@ require __DIR__ . '/../includes/header.php';
                 <?php else: ?>
                     <?php foreach ($liabilitas as $utang): 
                         $sisa = (float)$utang['total'] - (float)$utang['terbayar'];
+                        $isUtangManual = (($utang['source_type'] ?? '') === 'manual');
+                        $isCanceled = (($utang['status'] ?? '') === 'BATAL');
                         
                         // Menentukan badge kategori
                         $badgeClass = 'badge-ul';
                         if ($utang['jenis'] === 'Alat Berat') $badgeClass = 'badge-ab';
                         elseif ($utang['jenis'] === 'Sparepart') $badgeClass = 'badge-sp';
                         elseif ($utang['jenis'] === 'Restorasi') $badgeClass = 'badge-rs';
-                        
-                        $isUtangManual = !in_array($utang['jenis'], ['Alat Berat', 'Sparepart', 'Restorasi']);
 
                         // Menentukan status jatuh tempo
                         $jtDate = $utang['jatuh_tempo_terdekat'];
@@ -634,6 +761,9 @@ require __DIR__ . '/../includes/header.php';
                             <td>
                                 <strong><?php echo h($utang['nomor']); ?></strong>
                                 <div style="margin-top:4px;"><span class="badge <?php echo $badgeClass; ?>"><?php echo h($utang['jenis']); ?></span></div>
+                                <?php if ($isCanceled): ?>
+                                    <div style="margin-top:4px;"><span class="badge badge-neutral">Dibatalkan</span></div>
+                                <?php endif; ?>
                             </td>
                             <td>
                                 <strong><?php echo h($utang['nama_supplier'] ?? 'Unknown Supplier'); ?></strong>
@@ -668,7 +798,32 @@ require __DIR__ . '/../includes/header.php';
                             </td>
                             <td class="center">
                                 <?php if ($isUtangManual): ?>
-                                    <button onclick="openBayarModal(<?php echo $utang['id']; ?>, <?php echo $sisa; ?>)" style="color:#0d6efd; background:none; text-decoration:none; font-weight:600; font-size:12px; border:1px solid #0d6efd; padding:4px 8px; border-radius:4px; display:inline-block; cursor:pointer;">Bayar Utang</button>
+                                    <div class="action-stack">
+                                        <?php if (!$isCanceled): ?>
+                                            <button type="button" class="btn-secondary btn-small" onclick='openEditUtangModal(<?php echo json_encode([
+                                            'id' => (int)$utang['manual_id'],
+                                            'nomor_referensi' => (string)($utang['nomor'] ?? ''),
+                                            'kreditur' => (string)($utang['nama_supplier'] ?? ''),
+                                            'kategori' => (string)($utang['jenis'] ?? 'LAINNYA'),
+                                            'tanggal' => (string)($utang['tanggal'] ?? date('Y-m-d')),
+                                            'jatuh_tempo' => (string)($utang['jatuh_tempo_terdekat'] ?? ''),
+                                            'total' => (string)((float)$utang['total']),
+                                            'keterangan' => (string)($utang['keterangan'] ?? '')
+                                        ]); ?>)'>Edit</button>
+                                            <form method="POST" action="" onsubmit="return confirm('Batalkan utang ini?')" style="display:inline;">
+                                                <input type="hidden" name="action" value="cancel_utang">
+                                                <input type="hidden" name="utang_id" value="<?php echo (int)$utang['manual_id']; ?>">
+                                                <button type="submit" class="btn-danger">Batalkan</button>
+                                            </form>
+                                            <button type="button" class="btn-secondary btn-small" onclick="openBayarModal(<?php echo $utang['id']; ?>, <?php echo $sisa; ?>)">Bayar Utang</button>
+                                        <?php else: ?>
+                                            <form method="POST" action="" onsubmit="return confirm('Hapus permanen utang yang sudah dibatalkan ini?')" style="display:inline;">
+                                                <input type="hidden" name="action" value="delete_utang">
+                                                <input type="hidden" name="utang_id" value="<?php echo (int)$utang['manual_id']; ?>">
+                                                <button type="submit" class="btn-danger">Hapus</button>
+                                            </form>
+                                        <?php endif; ?>
+                                    </div>
                                 <?php else: ?>
                                     <span class="muted">-</span>
                                 <?php endif; ?>
@@ -750,6 +905,68 @@ require __DIR__ . '/../includes/header.php';
             <div class="liability-modal-footer">
                 <button type="button" class="btn-secondary" data-close-modal="modalTambahUtang">Batal</button>
                 <button type="submit" class="btn-primary">Tambah Utang</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Edit Utang -->
+<div class="liability-modal" id="modalEditUtang" aria-hidden="true">
+    <div class="liability-modal-box">
+        <div class="liability-modal-header">
+            <div>
+                <h3>Edit Utang Manual</h3>
+                <p>Ubah data hutang yang telah dibuat sebelumnya.</p>
+            </div>
+            <button type="button" class="liability-modal-close" data-close-modal="modalEditUtang">&times;</button>
+        </div>
+        <form method="POST" action="">
+            <input type="hidden" name="action" value="edit_utang">
+            <input type="hidden" name="utang_id" id="edit_utang_id" value="">
+            <div class="liability-modal-body">
+                <div class="liability-form-grid">
+                    <div class="liability-field liability-field-full">
+                        <label>Nomor Referensi <span>*</span></label>
+                        <input type="text" id="edit_nomor_referensi" name="nomor_referensi" required>
+                    </div>
+
+                    <div class="liability-field">
+                        <label>Kreditur <span>*</span></label>
+                        <input type="text" id="edit_kreditur" name="kreditur" required>
+                    </div>
+                    <div class="liability-field">
+                        <label>Kategori <span>*</span></label>
+                        <select id="edit_kategori" name="kategori" required>
+                            <option value="">-- Pilih Kategori --</option>
+                            <?php foreach ($allCats as $val => $label): ?>
+                                <option value="<?php echo h($val); ?>"><?php echo h($label); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div class="liability-field">
+                        <label>Tanggal Hutang <span>*</span></label>
+                        <input type="date" id="edit_tanggal" name="tanggal" required>
+                    </div>
+                    <div class="liability-field">
+                        <label>Jatuh Tempo</label>
+                        <input type="date" id="edit_jatuh_tempo" name="jatuh_tempo">
+                    </div>
+
+                    <div class="liability-field liability-field-full">
+                        <label>Total Hutang (Rp) <span>*</span></label>
+                        <input type="text" id="edit_total" name="total" required onkeyup="formatRupiah(this)">
+                    </div>
+
+                    <div class="liability-field liability-field-full">
+                        <label>Keterangan</label>
+                        <textarea id="edit_keterangan" name="keterangan" rows="2"></textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="liability-modal-footer">
+                <button type="button" class="btn-secondary" data-close-modal="modalEditUtang">Batal</button>
+                <button type="submit" class="btn-primary">Simpan Perubahan</button>
             </div>
         </form>
     </div>
@@ -869,6 +1086,18 @@ document.addEventListener('keydown', function (e) {
 
 function openTambahModal() {
     openModal('modalTambahUtang');
+}
+
+function openEditUtangModal(data) {
+    document.getElementById('edit_utang_id').value = data.id;
+    document.getElementById('edit_nomor_referensi').value = data.nomor_referensi || '';
+    document.getElementById('edit_kreditur').value = data.kreditur || '';
+    document.getElementById('edit_kategori').value = data.kategori || '';
+    document.getElementById('edit_tanggal').value = data.tanggal || '';
+    document.getElementById('edit_jatuh_tempo').value = data.jatuh_tempo || '';
+    document.getElementById('edit_total').value = data.total ? 'Rp ' + Number(data.total).toLocaleString('id-ID') : '';
+    document.getElementById('edit_keterangan').value = data.keterangan || '';
+    openModal('modalEditUtang');
 }
 
 function openBayarModal(id, sisa) {
