@@ -26,6 +26,42 @@ $features = [
         "desc" => "Tim teknisi berpengalaman siap diterjunkan langsung ke lokasi proyek saat dibutuhkan."
     ]
 ];
+
+require_once __DIR__ . '/config/koneksi.php';
+
+$publicUnits = [];
+$publicStatuses = "UPPER(status) IN ('TERSEDIA', 'SIAP JUAL', 'READY', 'DISEWAKAN', 'DI SEWAKAN', 'RENTAL')";
+
+try {
+    $pdo = getPDO();
+    try {
+        $stmt = $pdo->query("SELECT ab.tipe, ab.tahun_pembuatan, ab.kondisi, ab.status,
+                (SELECT ai.file_path FROM alat_berat_image ai
+                 WHERE ai.alat_berat_id = ab.id
+                 ORDER BY ai.id ASC LIMIT 1) AS foto_utama
+            FROM alat_berat ab
+            WHERE {$publicStatuses}
+            ORDER BY FIELD(UPPER(ab.status), 'TERSEDIA', 'SIAP JUAL', 'READY', 'DISEWAKAN', 'DI SEWAKAN', 'RENTAL'), ab.tipe ASC, ab.id DESC
+            LIMIT 9");
+    } catch (Throwable $imageException) {
+        $stmt = $pdo->query("SELECT tipe, tahun_pembuatan, kondisi, status, NULL AS foto_utama
+            FROM alat_berat
+            WHERE {$publicStatuses}
+            ORDER BY FIELD(UPPER(status), 'TERSEDIA', 'SIAP JUAL', 'READY', 'DISEWAKAN', 'DI SEWAKAN', 'RENTAL'), tipe ASC, id DESC
+            LIMIT 9");
+    }
+    $publicUnits = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Throwable $exception) {
+    error_log($exception->getMessage());
+}
+
+function publicUnitStatus($status): string
+{
+    $status = strtoupper(trim((string) $status));
+    return in_array($status, ['DISEWAKAN', 'DI SEWAKAN', 'RENTAL'], true)
+        ? 'Disewakan'
+        : 'Tersedia untuk dibeli';
+}
 ?>
 <!DOCTYPE html>
 <html lang="id" class="scroll-smooth">
@@ -89,10 +125,9 @@ $features = [
             </div>
             
             <div class="relative flex justify-center lg:justify-end">
-                <div class="w-full max-w-md bg-slate-100 rounded-2xl p-8 border border-slate-200 aspect-square flex items-center justify-center">
-                    <svg class="w-48 h-48 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5m0 0h4m-4 0v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
-                    </svg>
+                <div class="w-full max-w-md bg-white-100 rounded-2xl p-8 aspect-square flex items-center justify-center">
+                    <img src="assets/img/logo.png" alt="Logo ASRINDO"
+                        class="w-full h-full object-contain">
                 </div>
             </div>
         </div>
@@ -132,38 +167,50 @@ $features = [
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div class="border border-slate-200 rounded-xl overflow-hidden hover:border-black transition-all">
-                <div class="h-48 bg-slate-100 flex items-center justify-center">
-                    <span class="text-slate-400 font-medium">[ Foto Excavator ]</span>
+            <?php if ($publicUnits === []): ?>
+                <div class="md:col-span-3 border border-dashed border-slate-300 rounded-xl p-10 text-center text-slate-500">
+                    Belum ada unit yang tersedia untuk dijual atau disewakan.
                 </div>
-                <div class="p-6">
-                    <h3 class="font-bold text-xl mb-2">Excavator Hydraulic 20 Ton</h3>
-                    <p class="text-slate-600 text-sm mb-4">Ideal untuk pengerjaan galian tanah skala besar, konstruksi jalan, dan pertambangan.</p>
-                    <a href="#kontak" class="text-black font-semibold text-sm hover:underline">Sewa / Beli Unit &rarr;</a>
-                </div>
-            </div>
-
-            <div class="border border-slate-200 rounded-xl overflow-hidden hover:border-black transition-all">
-                <div class="h-48 bg-slate-100 flex items-center justify-center">
-                    <span class="text-slate-400 font-medium">[ Foto Bulldozer ]</span>
-                </div>
-                <div class="p-6">
-                    <h3 class="font-bold text-xl mb-2">Bulldozer Heavy Duty</h3>
-                    <p class="text-slate-600 text-sm mb-4">Dirancang untuk pemerataan lahan, dorongan material berat, dan pembukaan jalur.</p>
-                    <a href="#kontak" class="text-black font-semibold text-sm hover:underline">Sewa / Beli Unit &rarr;</a>
-                </div>
-            </div>
-
-            <div class="border border-slate-200 rounded-xl overflow-hidden hover:border-black transition-all">
-                <div class="h-48 bg-slate-100 flex items-center justify-center">
-                    <span class="text-slate-400 font-medium">[ Foto Wheel Loader ]</span>
-                </div>
-                <div class="p-6">
-                    <h3 class="font-bold text-xl mb-2">Wheel Loader 3m³</h3>
-                    <p class="text-slate-600 text-sm mb-4">Efisiensi tinggi untuk memindahkan material curah ke truk pemuat di area kerja.</p>
-                    <a href="#kontak" class="text-black font-semibold text-sm hover:underline">Sewa / Beli Unit &rarr;</a>
-                </div>
-            </div>
+            <?php else: ?>
+                <?php foreach ($publicUnits as $unit): ?>
+                    <?php
+                    $unitType = trim((string) ($unit['tipe'] ?? 'Unit alat berat'));
+                    $unitPhoto = trim((string) ($unit['foto_utama'] ?? ''));
+                    $unitPhoto = strpos($unitPhoto, '..') === false ? ltrim($unitPhoto, '/') : '';
+                    $unitStatus = publicUnitStatus((string) ($unit['status'] ?? ''));
+                    ?>
+                    <article class="border border-slate-200 rounded-xl overflow-hidden hover:border-black transition-all bg-white">
+                        <div class="h-48 bg-slate-100 flex items-center justify-center relative overflow-hidden">
+                            <?php if ($unitPhoto !== ''): ?>
+                                <img src="<?php echo htmlspecialchars($unitPhoto, ENT_QUOTES, 'UTF-8'); ?>"
+                                    alt="Foto <?php echo htmlspecialchars($unitType, ENT_QUOTES, 'UTF-8'); ?>"
+                                    class="w-full h-full object-cover">
+                            <?php else: ?>
+                                <span class="text-slate-400 font-medium text-center px-4">
+                                    <?php echo htmlspecialchars($unitType, ENT_QUOTES, 'UTF-8'); ?>
+                                </span>
+                            <?php endif; ?>
+                            <span class="absolute top-3 left-3 bg-black text-white text-xs px-3 py-1 rounded-full">
+                                <?php echo htmlspecialchars($unitStatus, ENT_QUOTES, 'UTF-8'); ?>
+                            </span>
+                        </div>
+                        <div class="p-6">
+                            <h3 class="font-bold text-xl mb-3">
+                                <?php echo htmlspecialchars($unitType, ENT_QUOTES, 'UTF-8'); ?>
+                            </h3>
+                            <div class="flex flex-wrap gap-2 text-slate-500 text-sm mb-4">
+                                <?php if (!empty($unit['tahun_pembuatan'])): ?>
+                                    <span><?php echo htmlspecialchars((string) $unit['tahun_pembuatan'], ENT_QUOTES, 'UTF-8'); ?></span>
+                                <?php endif; ?>
+                                <?php if (!empty($unit['kondisi'])): ?>
+                                    <span><?php echo htmlspecialchars((string) $unit['kondisi'], ENT_QUOTES, 'UTF-8'); ?></span>
+                                <?php endif; ?>
+                            </div>
+                            <a href="#kontak" class="text-black font-semibold text-sm hover:underline">Tanya unit ini &rarr;</a>
+                        </div>
+                    </article>
+                <?php endforeach; ?>
+            <?php endif; ?>
         </div>
     </section>
 
