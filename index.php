@@ -62,6 +62,19 @@ function publicUnitStatus($status): string
         ? 'Disewakan'
         : 'Tersedia untuk dibeli';
 }
+
+function publicAssetUrl($path): string
+{
+    $path = trim(str_replace('\\', '/', (string) $path));
+    if ($path === '' || strpos($path, '..') !== false) {
+        return '';
+    }
+
+    $basePath = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/'));
+    $basePath = $basePath === '/' || $basePath === '.' ? '' : rtrim($basePath, '/');
+
+    return $basePath . '/' . ltrim($path, '/');
+}
 ?>
 <!DOCTYPE html>
 <html lang="id" class="scroll-smooth">
@@ -126,7 +139,7 @@ function publicUnitStatus($status): string
             
             <div class="relative flex justify-center lg:justify-end">
                 <div class="w-full max-w-md bg-white-100 rounded-2xl p-8 aspect-square flex items-center justify-center">
-                    <img src="assets/img/logo.png" alt="Logo ASRINDO"
+                    <img src="<?php echo htmlspecialchars(publicAssetUrl('assets/img/logo.png'), ENT_QUOTES, 'UTF-8'); ?>" alt="Logo ASRINDO"
                         class="w-full h-full object-contain">
                 </div>
             </div>
@@ -175,8 +188,7 @@ function publicUnitStatus($status): string
                 <?php foreach ($publicUnits as $unit): ?>
                     <?php
                     $unitType = trim((string) ($unit['tipe'] ?? 'Unit alat berat'));
-                    $unitPhoto = trim((string) ($unit['foto_utama'] ?? ''));
-                    $unitPhoto = strpos($unitPhoto, '..') === false ? ltrim($unitPhoto, '/') : '';
+                    $unitPhoto = publicAssetUrl($unit['foto_utama'] ?? '');
                     $unitStatus = publicUnitStatus((string) ($unit['status'] ?? ''));
                     ?>
                     <article class="border border-slate-200 rounded-xl overflow-hidden hover:border-black transition-all bg-white">

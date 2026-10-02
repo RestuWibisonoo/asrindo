@@ -64,7 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <main class="login-wrapper">
 <section class="login-card">
     <div class="login-brand">
-        <img src="../assets/images/logo.png" alt="ASRINDO" class="login-logo"
+        <img src="../assets/img/logo.png" alt="ASRINDO" class="login-logo"
              onerror="this.style.display='none';document.querySelector('.logo-fallback').style.display='flex';">
         <div class="logo-fallback">ASRINDO</div>
     </div>
